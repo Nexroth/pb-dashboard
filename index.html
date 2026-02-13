@@ -260,10 +260,21 @@
         </div>
 
         <div class="setting-group">
+          <h3>Updates</h3>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <span style="color: var(--text-secondary);">Current Version: <strong id="currentVersion">2.0.0</strong></span>
+          </div>
+          <button id="checkUpdatesBtn" class="btn btn-primary">Check for Updates</button>
+          <div id="updateNotification" style="display: none; margin-top: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border-left: 3px solid var(--accent);">
+            <p style="font-weight: 600; margin-bottom: 8px;"><span id="updateStatus"></span></p>
+            <div id="updateInstructions" style="color: var(--text-secondary); font-size: 0.9rem;"></div>
+          </div>
+        </div>
+
+        <div class="setting-group">
           <h3>About</h3>
           <img src="logo.png" alt="Dashboard" class="about-logo">
           <p>The PB Dashboard</p>
-          <p>Version 2.0</p>
           <p>A self hosted bookmark and project tracking dashboard.</p>
           <p><em>For my team</em></p>
           <p>Author: Raf</p>
@@ -575,6 +586,45 @@
         </div>
       </div>
     </div>
+  </div>
+
+
+  <!-- Project Info Modal -->
+  <div class="modal" id="projectInfoModal">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2 id="projectInfoTitle">Project Info</h2>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="projectInfoDescription" style="margin-bottom: 16px; color: var(--text-secondary);"></div>
+        <div id="projectInfoNotes" style="white-space: pre-wrap; color: var(--text-primary);"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Info Modal -->
+  <div class="modal" id="taskInfoModal">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2 id="taskInfoTitle">Task Info</h2>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="taskInfoMeta" style="margin-bottom: 16px; color: var(--text-secondary); font-size: 0.9rem;"></div>
+        <div id="taskInfoNotes" style="margin-bottom: 20px;"></div>
+        <div id="taskInfoTodos"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close">Close</button>
+        <button class="btn btn-primary" id="editTaskFromInfoBtn">Edit Task</button>
+      </div>
+    </div>
+  </div>
+
   </div>
 
 

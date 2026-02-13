@@ -1,3 +1,6 @@
+// Dashboard version
+const DASHBOARD_VERSION = '2.1.0';
+
 // Default news feeds
 const DEFAULT_FEEDS = [
   'https://news.ycombinator.com/rss',
@@ -398,6 +401,15 @@ function initializeEventListeners() {
     });
   });
 
+  // Click outside modal to close
+  document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.remove('active');
+      }
+    });
+  });
+
   // News manage buttons
   document.getElementById('rssManageBtn').addEventListener('click', () => {
     openModal('rssSettingsModal');
@@ -461,6 +473,122 @@ function initializeEventListeners() {
   }
 
   document.addEventListener('keydown', handlePasteBookmark);
+  
+  // Check for updates button
+  const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
+  if (checkUpdatesBtn) {
+    checkUpdatesBtn.addEventListener('click', checkForUpdates);
+  }
+  
+  // Display current version
+  const versionEl = document.getElementById('currentVersion');
+  if (versionEl) {
+    versionEl.textContent = DASHBOARD_VERSION;
+  }
+}
+
+function compareVersions(v1, v2) {
+  // Normalize versions to [major, minor, patch]
+  const normalize = (v) => {
+    const parts = v.split('.').map(n => parseInt(n) || 0);
+    while (parts.length < 3) parts.push(0); // Pad to 3 parts
+    return parts;
+  };
+  
+  const parts1 = normalize(v1);
+  const parts2 = normalize(v2);
+  
+  // Compare each part
+  for (let i = 0; i < 3; i++) {
+    if (parts1[i] > parts2[i]) return 1;  // v1 is newer
+    if (parts1[i] < parts2[i]) return -1; // v2 is newer
+  }
+  
+  return 0; // Equal
+}
+
+async function checkForUpdates() {
+  const btn = document.getElementById('checkUpdatesBtn');
+  const notification = document.getElementById('updateNotification');
+  const statusEl = document.getElementById('updateStatus');
+  const instructionsEl = document.getElementById('updateInstructions');
+  
+  // Show loading state
+  btn.textContent = 'Checking...';
+  btn.disabled = true;
+  notification.style.display = 'none';
+  
+  try {
+    // Fetch latest release from GitHub
+    const response = await fetch('https://api.github.com/repos/Nexroth/pb-dashboard/releases/latest');
+    
+    if (!response.ok) {
+      throw new Error('Failed to check for updates');
+    }
+    
+    const release = await response.json();
+    const latestVersion = release.tag_name.replace('v', ''); // Remove 'v' prefix if present
+    
+    // Compare versions
+    const comparison = compareVersions(latestVersion, DASHBOARD_VERSION);
+    
+    if (comparison === 0) {
+      // Up to date
+      statusEl.textContent = '✅ You have the latest version';
+      statusEl.style.color = 'var(--accent)';
+      instructionsEl.innerHTML = 'No updates available.';
+    } else if (comparison > 0) {
+      // Update available (latestVersion is newer)
+      statusEl.textContent = `🔔 Update Available: v${latestVersion}`;
+      statusEl.style.color = '#eab308';
+      
+      instructionsEl.innerHTML = `
+        <p style="margin-bottom: 8px;"><strong>To update:</strong></p>
+        <ol style="margin-left: 20px; line-height: 1.6;">
+          <li>Click the link below to go to the releases page</li>
+          <li>Download the <strong>pb-dashboard.zip</strong> file</li>
+          <li>Extract the ZIP file</li>
+          <li>Copy all files and replace them in your current dashboard folder</li>
+          <li>Refresh your browser (Ctrl+F5 or Cmd+Shift+R)</li>
+        </ol>
+        <p style="margin-top: 12px;">
+          <a href="${release.html_url}" target="_blank" style="color: var(--accent); text-decoration: underline; font-weight: 600;">
+            View Release v${latestVersion} →
+          </a>
+        </p>
+        ${release.body ? `
+          <details style="margin-top: 12px;">
+            <summary style="cursor: pointer; color: var(--accent); font-weight: 600;">What's New</summary>
+            <div style="margin-top: 8px; white-space: pre-wrap; font-size: 0.85rem;">${release.body}</div>
+          </details>
+        ` : ''}
+      `;
+    } else {
+      // Current version is newer than latest release (development version)
+      statusEl.textContent = `✅ You have a newer version (v${DASHBOARD_VERSION})`;
+      statusEl.style.color = 'var(--accent)';
+      instructionsEl.innerHTML = `Latest release is v${latestVersion}. You're running a development or pre-release version.`;
+    }
+    
+    notification.style.display = 'block';
+    
+  } catch (error) {
+    console.error('Error checking for updates:', error);
+    statusEl.textContent = '❌ Could not check for updates';
+    statusEl.style.color = '#ef4444';
+    instructionsEl.innerHTML = `
+      <p>Unable to connect to GitHub. Please try again later or check manually:</p>
+      <p style="margin-top: 8px;">
+        <a href="https://github.com/Nexroth/pb-dashboard/releases" target="_blank" style="color: var(--accent); text-decoration: underline;">
+          View Releases on GitHub →
+        </a>
+      </p>
+    `;
+    notification.style.display = 'block';
+  } finally {
+    btn.textContent = 'Check for Updates';
+    btn.disabled = false;
+  }
 }
 
 function switchPage(pageName) {
@@ -2137,11 +2265,37 @@ function showProjectInfo(projectId) {
   const proj = dashboardData.projects.find(p => p.id === projectId);
   if (!proj) return;
   
-  showInfoPanel(
-    proj.name,
-    proj.notes || 'No notes for this project.',
-    proj.description ? `<div style="margin-bottom:12px;color:var(--text-secondary)"><strong>Description:</strong><br>${proj.description}</div>` : ''
-  );
+  // Populate modal
+  document.getElementById('projectInfoTitle').textContent = proj.name;
+  
+  const descEl = document.getElementById('projectInfoDescription');
+  if (proj.description) {
+    descEl.innerHTML = `<strong>Description:</strong><br>${escapeHtml(proj.description)}`;
+    descEl.style.display = 'block';
+  } else {
+    descEl.style.display = 'none';
+  }
+  
+  const notesEl = document.getElementById('projectInfoNotes');
+  if (proj.notes) {
+    notesEl.textContent = proj.notes;
+    notesEl.style.display = 'block';
+  } else {
+    notesEl.textContent = 'No notes for this project.';
+    notesEl.style.display = 'block';
+    notesEl.style.fontStyle = 'italic';
+    notesEl.style.color = 'var(--text-secondary)';
+  }
+  
+  // Wire up close buttons for this modal specifically
+  const projectInfoModal = document.getElementById('projectInfoModal');
+  if (projectInfoModal) {
+    projectInfoModal.querySelectorAll('.modal-close').forEach(btn => {
+      btn.onclick = () => closeModal('projectInfoModal');
+    });
+  }
+  
+  openModal('projectInfoModal');
 }
 
 function exportProjectAsHTML(projectId) {
@@ -2166,33 +2320,33 @@ function exportProjectAsHTML(projectId) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(proj.name)} - Project Export</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6; color: #333; }
-    h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
-    h2 { color: #34495e; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
-    h3 { color: #555; margin-top: 25px; }
-    .meta { background: #f5f7fa; padding: 15px; border-radius: 8px; margin: 20px 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6; color: #eaeaea; background: #1a1a2e; }
+    h1 { color: #eaeaea; border-bottom: 3px solid #0ea5e9; padding-bottom: 10px; }
+    h2 { color: #d4d4d4; margin-top: 30px; border-bottom: 1px solid #2d3748; padding-bottom: 5px; }
+    h3 { color: #b8b8b8; margin-top: 25px; }
+    .meta { background: #16213e; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #2d3748; }
     .meta-item { margin: 8px 0; }
-    .meta-label { font-weight: 600; color: #555; }
-    .progress-bar { background: #ecf0f1; height: 24px; border-radius: 12px; overflow: hidden; margin: 10px 0; }
-    .progress-fill { background: #3498db; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 12px; }
-    .task { background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; margin: 10px 0; }
+    .meta-label { font-weight: 600; color: #a0a0a0; }
+    .progress-bar { background: #2d3748; height: 24px; border-radius: 12px; overflow: hidden; margin: 10px 0; }
+    .progress-fill { background: #0ea5e9; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 12px; }
+    .task { background: #16213e; border: 1px solid #2d3748; border-radius: 6px; padding: 12px; margin: 10px 0; }
     .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .task-title { font-weight: 600; color: #2c3e50; }
-    .task-meta { font-size: 13px; color: #7f8c8d; }
+    .task-title { font-weight: 600; color: #eaeaea; }
+    .task-meta { font-size: 13px; color: #a0a0a0; }
     .priority { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
-    .priority-low { background: #d5f4e6; color: #27ae60; }
-    .priority-medium { background: #fff3cd; color: #f39c12; }
-    .priority-high { background: #ffe5d0; color: #e67e22; }
-    .priority-critical { background: #fadbd8; color: #e74c3c; }
-    .checkbox { display: inline-block; width: 16px; height: 16px; border: 2px solid #3498db; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
-    .checkbox-checked { background: #3498db; position: relative; }
+    .priority-low { background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .priority-medium { background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3); }
+    .priority-high { background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); }
+    .priority-critical { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .checkbox { display: inline-block; width: 16px; height: 16px; border: 2px solid #0ea5e9; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+    .checkbox-checked { background: #0ea5e9; position: relative; }
     .checkbox-checked::after { content: '✓'; color: white; position: absolute; left: 2px; top: -2px; font-size: 12px; }
-    .todos { margin-top: 10px; padding-left: 20px; }
+    .todos { margin-top: 10px; padding-left: 20px; color: #d4d4d4; }
     .todo-item { margin: 5px 0; }
-    .overdue { color: #e74c3c; font-weight: 600; }
+    .overdue { color: #ef4444; font-weight: 600; }
     .tags { margin-top: 8px; }
-    .tag { display: inline-block; background: #ecf0f1; color: #7f8c8d; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 6px; }
-    @media print { body { margin: 20px; } }
+    .tag { display: inline-block; background: #2d3748; color: #a0a0a0; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 6px; border: 1px solid #374151; }
+    @media print { body { margin: 20px; background: white; color: #333; } h1, h2, h3 { color: #333; } .meta, .task { background: white; border: 1px solid #ddd; } }
   </style>
 </head>
 <body>
@@ -2214,7 +2368,7 @@ function exportProjectAsHTML(projectId) {
 `;
 
   if (proj.notes) {
-    html += `\n  <h2>Notes</h2>\n  <div style="white-space: pre-wrap;">${escapeHtml(proj.notes)}</div>\n`;
+    html += `\n  <h2>Notes</h2>\n  <div style="white-space: pre-wrap; color: #d4d4d4;">${escapeHtml(proj.notes)}</div>\n`;
   }
 
   html += `\n  <h2>Tasks</h2>\n`;
@@ -2248,7 +2402,7 @@ function exportProjectAsHTML(projectId) {
     </div>`;
         
         if (task.notes) {
-          html += `\n    <div style="margin-top: 8px; color: #555; font-size: 14px;">${escapeHtml(task.notes)}</div>`;
+          html += `\n    <div style="margin-top: 8px; color: #a0a0a0; font-size: 14px;">${escapeHtml(task.notes)}</div>`;
         }
         
         if (totalTodos > 0) {
@@ -2271,7 +2425,7 @@ function exportProjectAsHTML(projectId) {
     });
   }
   
-  html += `\n  <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #7f8c8d; font-size: 13px;">
+  html += `\n  <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2d3748; color: #7f8c8d; font-size: 13px;">
     Exported from Dashboard on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
   </div>
 </body>
@@ -2572,6 +2726,16 @@ function renderProjectsTable() {
     });
   });
   
+  // Right-click context menu on project rows
+  wrapper.querySelectorAll('tbody tr').forEach(row => {
+    const projectId = sortedProjects[Array.from(row.parentElement.children).indexOf(row)].id;
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showProjectContextMenu(e, projectId);
+    });
+  });
+  
   lucide.createIcons();
 }
 function openEditProjectModal(projectId) {
@@ -2592,6 +2756,14 @@ function openEditProjectModal(projectId) {
   const has = folderInput.value.trim().length > 0;
   openBtn.style.display = has ? 'inline-flex' : 'none';
   clearBtn.style.display = has ? 'inline-flex' : 'none';
+
+  // Wire up close buttons for this modal specifically
+  const editProjectModal = document.getElementById('editProjectModal');
+  if (editProjectModal) {
+    editProjectModal.querySelectorAll('.modal-close').forEach(btn => {
+      btn.onclick = () => closeModal('editProjectModal');
+    });
+  }
 
   openModal('editProjectModal');
   setTimeout(() => document.getElementById('editProjectName').focus(), 100);
@@ -2850,15 +3022,7 @@ function renderKanban() {
     // Card click events
     colEl.querySelectorAll('.task-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.task-card-action')) return;
-        openTaskModal(card.dataset.taskId);
-      });
-    });
-
-    colEl.querySelectorAll('.task-card-delete').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteTask(btn.dataset.taskId);
+        showTaskInfo(card.dataset.taskId);
       });
     });
 
@@ -2922,9 +3086,6 @@ function renderTaskCard(task) {
     <div class="task-card" data-task-id="${task.id}">
       <div class="task-card-header">
         <span class="priority-badge ${priorityClass}">${priorityLabel}</span>
-        <button class="task-card-action task-card-delete" data-task-id="${task.id}" title="Delete task">
-          <i data-lucide="x"></i>
-        </button>
       </div>
       <div class="task-card-title">${task.title}</div>
       <div class="task-card-footer">
@@ -2971,7 +3132,7 @@ function renderTable() {
           ${thSort('priority','Priority')}
           ${thSort('dueDate','Due Date')}
           ${thSort('progress','Progress')}
-          <th>Tags</th>
+          <th>Folder</th>
           <th></th>
         </tr>
       </thead>
@@ -2982,15 +3143,20 @@ function renderTable() {
           const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'Done' && task.status !== 'Completed';
           return `
             <tr class="task-row" data-task-id="${task.id}">
-              <td class="task-table-title">${task.title}${task.notes ? ' <span class="notes-dot" title="Has notes">●</span>' : ''}</td>
+              <td>
+                <div class="table-task-title">${task.title}${task.notes ? ' <span class="notes-dot" title="Has notes">●</span>' : ''}</div>
+                ${task.tags ? `<div style="margin-top:4px;"><span class="task-tag">${task.tags}</span></div>` : ''}
+              </td>
               <td><span class="status-pill">${task.status}</span></td>
               <td><span class="priority-badge priority-${task.priority}">${task.priority}</span></td>
-              <td class="${isOverdue ? 'overdue' : ''}">${task.dueDate ? formatDate(task.dueDate) : '—'}</td>
-              <td>${totalTodos > 0 ? `<div class="todo-progress"><div class="todo-progress-bar" style="width:${Math.round(doneCount/totalTodos*100)}%"></div></div><small>${doneCount}/${totalTodos}</small>` : '—'}</td>
-              <td>${task.tags ? `<span class="task-tag">${task.tags}</span>` : ''} ${task.folderPath ? `<button class="icon-btn" onclick="openFolder('${task.folderPath.replace(/'/g,"\\'")}')"><i data-lucide="folder-open"></i></button>` : task.tags ? '' : '—'}</td>
+              <td class="${isOverdue ? 'overdue' : ''}">${task.dueDate ? formatDate(task.dueDate) : '<span style="color:var(--text-secondary)">—</span>'}</td>
+              <td>${totalTodos > 0 ? `<div class="todo-progress"><div class="todo-progress-bar" style="width:${Math.round(doneCount/totalTodos*100)}%"></div></div><small>${doneCount}/${totalTodos}</small>` : '<span style="color:var(--text-secondary)">—</span>'}</td>
+              <td>${task.folderPath ? `<button class="icon-btn" onclick="openFolder('${task.folderPath.replace(/'/g,"\\'")}')"><i data-lucide="folder-open"></i></button>` : '<span style="color:var(--text-secondary)">—</span>'}</td>
               <td>
-                <button class="icon-btn table-edit-btn" data-task-id="${task.id}" title="Edit"><i data-lucide="edit-2"></i></button>
-                <button class="icon-btn table-delete-btn" data-task-id="${task.id}" title="Delete"><i data-lucide="trash-2"></i></button>
+                <div style="display:flex;gap:4px;">
+                  <button class="icon-btn table-edit-btn" data-task-id="${task.id}" title="Edit"><i data-lucide="edit-2"></i></button>
+                  <button class="icon-btn table-delete-btn" data-task-id="${task.id}" title="Delete"><i data-lucide="trash-2"></i></button>
+                </div>
               </td>
             </tr>
           `;
@@ -3016,7 +3182,14 @@ function renderTable() {
   wrapper.querySelectorAll('.task-row').forEach(row => {
     row.addEventListener('click', (e) => {
       if (e.target.closest('.icon-btn')) return;
-      openTaskModal(row.dataset.taskId);
+      showTaskInfo(row.dataset.taskId);
+    });
+    
+    // Right-click context menu on task rows
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showTaskContextMenu(e, row.dataset.taskId);
     });
   });
 
@@ -3032,6 +3205,190 @@ function renderTable() {
 }
 
 // -------- TASK MODAL --------
+
+function showTaskContextMenu(e, taskId) {
+  // Remove any existing context menu
+  const existing = document.getElementById('taskContextMenu');
+  if (existing) existing.remove();
+  
+  const project = getActiveProject();
+  if (!project) return;
+  
+  const task = project.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  
+  const menu = document.createElement('div');
+  menu.id = 'taskContextMenu';
+  menu.className = 'context-menu';
+  menu.style.position = 'fixed';
+  menu.style.left = `${e.clientX}px`;
+  menu.style.top = `${e.clientY}px`;
+  menu.style.zIndex = '10000';
+  
+  menu.innerHTML = `
+    <div class="context-menu-item" data-action="viewInfo">
+      <i data-lucide="file-text"></i>
+      <span>View Info</span>
+    </div>
+    <div class="context-menu-item" data-action="edit">
+      <i data-lucide="edit-2"></i>
+      <span>Edit Task</span>
+    </div>
+    ${task.folderPath ? `
+    <div class="context-menu-item" data-action="openFolder">
+      <i data-lucide="folder-open"></i>
+      <span>Open Folder</span>
+    </div>
+    ` : ''}
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" data-action="delete">
+      <i data-lucide="trash-2"></i>
+      <span>Delete Task</span>
+    </div>
+  `;
+  
+  document.body.appendChild(menu);
+  lucide.createIcons();
+  
+  // Handle menu actions
+  menu.querySelectorAll('.context-menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      menu.remove();
+      
+      switch(action) {
+        case 'viewInfo':
+          showTaskInfo(taskId);
+          break;
+        case 'edit':
+          openTaskModal(taskId);
+          break;
+        case 'openFolder':
+          if (task.folderPath) openFolder(task.folderPath);
+          break;
+        case 'delete':
+          deleteTask(taskId);
+          break;
+      }
+    });
+  });
+  
+  // Close menu on click outside
+  const closeMenu = (e) => {
+    if (!menu.contains(e.target)) {
+      menu.remove();
+      document.removeEventListener('click', closeMenu);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeMenu), 0);
+}
+
+function showTaskInfo(taskId) {
+  const project = getActiveProject();
+  if (!project) return;
+  
+  const task = project.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  
+  // Set title
+  const titleEl = document.getElementById('taskInfoTitle');
+  if (!titleEl) return;
+  titleEl.textContent = task.title;
+  
+  // Set meta info (priority, due date, status)
+  const metaEl = document.getElementById('taskInfoMeta');
+  if (!metaEl) return;
+  
+  const priorityColors = {
+    low: '#22c55e',
+    medium: '#eab308',
+    high: '#f97316',
+    critical: '#ef4444'
+  };
+  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'Done' && task.status !== 'Completed';
+  
+  let metaHTML = `<span style="color: ${priorityColors[task.priority]}; font-weight: 600; text-transform: uppercase; font-size: 0.85rem;">${task.priority}</span>`;
+  metaHTML += ` • <span>${task.status}</span>`;
+  if (task.dueDate) {
+    metaHTML += ` • <span style="${isOverdue ? 'color: #ef4444; font-weight: 600;' : ''}">Due: ${formatDate(task.dueDate)}${isOverdue ? ' (OVERDUE)' : ''}</span>`;
+  }
+  if (task.tags) {
+    metaHTML += ` • <span>${task.tags}</span>`;
+  }
+  metaEl.innerHTML = metaHTML;
+  
+  // Set notes
+  const notesEl = document.getElementById('taskInfoNotes');
+  if (notesEl) {
+    if (task.notes && task.notes.trim()) {
+      notesEl.innerHTML = `<div style="margin-bottom: 8px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.85rem;">Notes</div><div style="white-space: pre-wrap; color: var(--text-primary);">${escapeHtml(task.notes)}</div>`;
+      notesEl.style.display = 'block';
+    } else {
+      notesEl.style.display = 'none';
+    }
+  }
+  
+  // Set todos
+  const todosEl = document.getElementById('taskInfoTodos');
+  if (todosEl) {
+    if (task.todos && task.todos.length > 0) {
+      const doneCount = task.todos.filter(t => t.done).length;
+      let todosHTML = `<div style="margin-bottom: 8px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.85rem;">Todos (${doneCount}/${task.todos.length})</div>`;
+      todosHTML += '<div style="display: flex; flex-direction: column; gap: 6px;">';
+      task.todos.forEach(todo => {
+        todosHTML += `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="color: ${todo.done ? 'var(--accent)' : 'var(--text-secondary)'}; font-size: 16px;">${todo.done ? '✓' : '☐'}</span>
+            <span style="color: var(--text-primary); ${todo.done ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${escapeHtml(todo.text)}</span>
+          </div>
+        `;
+      });
+      todosHTML += '</div>';
+      todosEl.innerHTML = todosHTML;
+      todosEl.style.display = 'block';
+    } else {
+      todosEl.style.display = 'none';
+    }
+  }
+  
+  // Wire up Edit button
+  const editBtn = document.getElementById('editTaskFromInfoBtn');
+  if (editBtn) {
+    editBtn.onclick = () => {
+      closeModal('taskInfoModal');
+      openTaskModal(taskId);
+    };
+  }
+  
+  // Wire up close buttons for this modal specifically
+  const taskInfoModal = document.getElementById('taskInfoModal');
+  if (taskInfoModal) {
+    taskInfoModal.querySelectorAll('.modal-close').forEach(btn => {
+      btn.onclick = () => closeModal('taskInfoModal');
+    });
+  }
+  
+  openModal('taskInfoModal');
+}
+
+// Modal utility functions
+function openModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+  } else {
+    console.error('Modal not found:', modalId);
+  }
+}
+
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
+}
 
 function openTaskModal(taskId) {
   const project = getActiveProject();
@@ -3065,6 +3422,15 @@ function openTaskModal(taskId) {
   }
 
   renderTodoList();
+  
+  // Wire up close buttons for this modal specifically
+  const taskModal = document.getElementById('taskModal');
+  if (taskModal) {
+    taskModal.querySelectorAll('.modal-close').forEach(btn => {
+      btn.onclick = () => closeModal('taskModal');
+    });
+  }
+  
   openModal('taskModal');
   document.getElementById('taskTitle').focus();
 }
