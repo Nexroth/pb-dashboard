@@ -1,0 +1,106 @@
+# Customization Guide
+
+## Themes
+
+Settings -> Theme -> select a preset or choose Custom.
+
+There are 8 preset themes: Light, Dark, Nordic, Catppuccin, Dracula, Solarized, Cyberpunk, and Peanut Butter.
+
+Custom exposes 5 color pickers:
+1. Background -- main page color
+2. Section/Sidebar -- section cards and the sidebar
+3. Bookmark Cards -- individual card color
+4. Text -- all text
+5. Accent -- badges, buttons, active borders, underlines
+
+The dashboard derives hover states and borders automatically from those five values.
+
+Keep contrast high between text and background. The accent color shows up everywhere -- badges, active nav, section header underlines -- so pick something that reads well on both your background and card colors.
+
+## RSS Feeds
+
+News page -> RSS Feeds -> gear button -> Manage.
+
+Paste a feed URL and click Add Feed. Each feed gets its own tab. To rename a tab, click the name field in the feed manager and type a new name -- press Enter or click away to save.
+
+The Morning Coffee tab aggregates the 3 most recent articles across all your feeds combined. It loads automatically when you open the News page.
+
+Most news sites have an RSS feed. If you can't find a link, try appending /rss or /feed to the site root URL, or check the footer.
+
+## Reddit
+
+News page -> Reddit -> gear button -> Manage.
+
+Type the subreddit name without the r/ prefix and click Add Subreddit. Shows top posts from the past week.
+
+## Bookmarks
+
+Right-click a bookmark -> Edit to change anything about it.
+
+You can add multiple tags (comma-separated). All tags show on the card as small badges. The search bar filters by bookmark names, URLs, notes, and tags.
+
+For icons, square images work best. The icon displays at 90x90px on the card. Any common image format works.
+
+## Projects
+
+Projects page -> New Project button.
+
+Fill in the name. Description, due date, tags, notes, and folder path are optional. The folder path is a local path on your machine -- when you open a folder, the path is copied to your clipboard since browsers can't open local folders directly.
+
+Project status can be: Planning, Active, On Hold, Completed, or Archived. You can set it in the modal or by dragging the card to a different column on the kanban board. A project can't be moved to Completed if it has unfinished tasks.
+
+Use "Hide Completed" and "Hide Archived" checkboxes to clean up the view. Archived projects don't show up in the Tasks dropdown but you can still search for them.
+
+To edit or delete a project, right-click its card.
+
+## Tasks
+
+From the Projects page, click View Tasks on a project card.
+
+Add Task button or Alt+T opens the task modal. Fields:
+- Title (required)
+- Status -- maps to the kanban columns
+- Priority -- Low, Medium, High, Critical
+- Due date
+- Tags -- comma-separated, all show on the card
+- Notes -- freetext, visible via right-click > View Notes & Todos
+- Folder path -- same clipboard behavior as project folders
+- To-do list -- line-by-line checklist items
+
+Right-click a task card to view notes and todos, edit, open folder, or delete.
+
+Switch between kanban and table view with the toggle at the top right of the Tasks page.
+
+## Keyboard Shortcuts
+
+Ctrl+V -- if a URL is on your clipboard and focus is not in a text field, opens the add-bookmark modal with the URL pre-filled.
+
+Alt+T -- opens the add-task modal when on the Tasks page.
+
+## Data Backup
+
+Settings -> Export Data -> saves a .json file with a date in the filename.
+
+Settings -> Import Data -> select a backup file to restore. Replaces everything currently in the dashboard.
+
+The export includes bookmarks, sections, projects, tasks, theme settings, RSS feeds, and Reddit subscriptions.
+
+## Multiple Devices
+
+Export from one device, import on another. No sync -- manual transfer only.
+
+## Changing Defaults
+
+The default RSS feeds and subreddits loaded on a fresh install are defined at the top of script.js (lines 2-9). Edit those arrays if you're distributing this to teammates.
+
+## Custom CSS
+
+Add rules at the end of styles.css. Theme colors use CSS variables (--bg-primary, --accent, etc.) so you can override them without touching the theme blocks.
+
+## Performance
+
+Feeds load on demand -- only when you click a tab. Images lazy-load. No external tracking. Works fine with 100+ bookmarks and multiple projects.
+
+## Security Notes
+
+The app blocks javascript: URLs and sanitizes user input. Don't store passwords or sensitive credentials in notes -- this is local storage like any other file on your computer. Anyone with device access can read localStorage data.

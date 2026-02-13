@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+</head>
+<body data-theme="dark">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>Dashboard</h2>
+      <button id="sidebarToggle" class="icon-btn">
+        <i data-lucide="menu"></i>
+      </button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="home">
+        <i data-lucide="home"></i>
+        <span>Home</span>
+      </a>
+      <a href="#" class="nav-item" data-page="news">
+        <i data-lucide="newspaper"></i>
+        <span>News</span>
+      </a>
+      <a href="#" class="nav-item" data-page="settings">
+        <i data-lucide="settings"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    
+    <!-- Home Page -->
+    <div id="homePage" class="page active">
+      <div class="page-header">
+        <h1>My Bookmarks</h1>
+        <input type="text" id="searchBox" class="form-control" placeholder="🔍 Search bookmarks, URLs, notes..." style="max-width: 400px;">
+        <button class="btn btn-primary" id="addSectionBtn">
+          <i data-lucide="plus"></i>
+          Add Section
+        </button>
+      </div>
+      <div id="sectionsContainer" class="sections-container"></div>
+    </div>
+
+    <!-- News Page -->
+    <div id="newsPage" class="page">
+      <div class="page-header">
+        <h1>News & Updates</h1>
+      </div>
+
+      <div class="news-container">
+        <!-- RSS Feeds Section -->
+        <div class="news-section">
+          <div class="news-section-header">
+            <h2>RSS Feeds</h2>
+            <button id="rssManageBtn" class="btn btn-small">⚙️ Manage</button>
+          </div>
+          <div class="news-tabs-container" id="rssFeedsContainer"></div>
+          <div id="rssContent" class="news-content">
+            <div class="loading">Select a feed to start</div>
+          </div>
+        </div>
+
+        <!-- Reddit Section -->
+        <div class="news-section">
+          <div class="news-section-header">
+            <h2>Reddit</h2>
+            <button id="redditManageBtn" class="btn btn-small">⚙️ Manage</button>
+          </div>
+          <div class="news-tabs-container" id="redditTabsContainer"></div>
+          <div id="redditContent" class="news-content">
+            <div class="loading">Select a subreddit to start</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Page -->
+    <div id="settingsPage" class="page">
+      <div class="page-header">
+        <h1>Settings</h1>
+      </div>
+      <div class="settings-content">
+        <div class="setting-group">
+          <h3>Theme</h3>
+          <select id="themeSelect" class="form-control">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="nordic">Nordic</option>
+            <option value="catppuccin">Catppuccin</option>
+            <option value="dracula">Dracula</option>
+            <option value="solarized">Solarized</option>
+            <option value="cyberpunk">Cyberpunk</option>
+            <option value="custom">Custom</option>
+          </select>
+          
+          <!-- Custom Theme Colors -->
+          <div id="customThemeColors" style="display: none; margin-top: 20px;">
+            <h4 style="margin-bottom: 15px;">Customize Colors</h4>
+            
+            <div class="color-picker-group">
+              <label for="customBgPrimary">Background Color</label>
+              <input type="color" id="customBgPrimary" class="color-picker" value="#1a1a2e">
+            </div>
+            
+            <div class="color-picker-group">
+              <label for="customBgSecondary">Section Card & Sidebar Color</label>
+              <input type="color" id="customBgSecondary" class="color-picker" value="#16213e">
+            </div>
+            
+            <div class="color-picker-group">
+              <label for="customBgTertiary">Bookmark Card Color</label>
+              <input type="color" id="customBgTertiary" class="color-picker" value="#0f1419">
+            </div>
+            
+            <div class="color-picker-group">
+              <label for="customTextPrimary">Text Color</label>
+              <input type="color" id="customTextPrimary" class="color-picker" value="#eaeaea">
+            </div>
+            
+            <div class="color-picker-group">
+              <label for="customAccent">Accent Color (Badge, Buttons, Lines)</label>
+              <input type="color" id="customAccent" class="color-picker" value="#0ea5e9">
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+              <button id="applyCustomTheme" class="btn btn-primary">Apply Custom Theme</button>
+              <button id="resetCustomTheme" class="btn btn-secondary">Reset to Default</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>Data Management</h3>
+          <button id="exportDataBtn" class="btn btn-primary">Export Data</button>
+          <button id="importDataBtn" class="btn btn-secondary">Import Data</button>
+          <input type="file" id="importFileInput" style="display: none;" accept=".json">
+        </div>
+
+        <div class="setting-group">
+          <h3>About</h3>
+          <p>The PB Dashboard</p>
+          <p>Version 2.0</p>
+          <p>A lightweight, bookmark and personal dashboard with news aggregation.</p>
+          <p><em>Built with care for organized web browsing.</em></p>
+          <p>Author: Raf</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="modal" id="addSectionModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add Section</h2>
+        <button class="modal-close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="sectionName">Section Name</label>
+          <input type="text" id="sectionName" class="form-control" placeholder="e.g., Work, Personal">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelSectionBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveSectionBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bookmark Modal -->
+  <div class="modal" id="bookmarkModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="bookmarkModalTitle">Add Bookmark</h2>
+        <button class="modal-close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="bookmarkName">Name</label>
+          <input type="text" id="bookmarkName" class="form-control" placeholder="Bookmark name">
+        </div>
+        <div class="form-group">
+          <label for="bookmarkUrl">URL</label>
+          <input type="url" id="bookmarkUrl" class="form-control" placeholder="https://example.com">
+        </div>
+        <div class="form-group">
+          <label for="bookmarkIcon">Icon/Logo (optional)</label>
+          <div class="icon-upload-wrapper">
+            <input type="file" id="bookmarkIcon" class="form-control" accept="image/*">
+            <div id="iconPreview" class="icon-preview">
+              <button type="button" class="icon-remove-btn" id="removeIconBtn" title="Remove icon">×</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="bookmarkNotes">Notes (optional)</label>
+          <textarea id="bookmarkNotes" class="form-control" placeholder="Add notes about this bookmark" rows="4"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelBookmarkBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveBookmarkBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RSS Settings Modal -->
+  <div class="modal" id="rssSettingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Manage RSS Feeds</h2>
+        <button class="modal-close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="morning-coffee-info">
+          <h3>☕ Morning Coffee</h3>
+          <p>The Morning Coffee tab aggregates the top 3 most recent articles from all your RSS feeds, giving you a quick daily digest.</p>
+        </div>
+        
+        <h3 style="margin-top: 20px;">Your RSS Feeds</h3>
+        <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+          Click on a feed name to edit it. Each feed gets its own tab.
+        </p>
+        <div id="newsFeedsList" class="feeds-list"></div>
+        <div class="form-group" style="margin-top: 20px;">
+          <input type="url" id="newFeedInput" class="form-control" placeholder="Paste RSS feed URL">
+          <button id="addFeedBtn" class="btn btn-primary" style="margin-top: 8px;">Add Feed</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reddit Settings Modal -->
+  <div class="modal" id="redditSettingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Manage Reddit Subreddits</h2>
+        <button class="modal-close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <h3>Added Subreddits</h3>
+        <div id="redditSubsList" class="feeds-list"></div>
+        <div class="form-group" style="margin-top: 20px;">
+          <input type="text" id="newRedditInput" class="form-control" placeholder="e.g., cybersecurity (without r/)">
+          <button id="addRedditBtn" class="btn btn-primary" style="margin-top: 8px;">Add Subreddit</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

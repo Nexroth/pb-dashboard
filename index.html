@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body data-theme="dark">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <img src="logo.png" alt="Dashboard" class="sidebar-logo">
+        <span class="sidebar-title">Dashboard</span>
+      </div>
+      <button id="sidebarToggle" class="icon-btn">
+        <i data-lucide="menu"></i>
+      </button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="home">
+        <i data-lucide="home"></i>
+        <span>Home</span>
+      </a>
+      <a href="#" class="nav-item" data-page="projects">
+        <i data-lucide="folder-kanban"></i>
+        <span>Projects</span>
+      </a>
+      <a href="#" class="nav-item" data-page="tasks">
+        <i data-lucide="layout-dashboard"></i>
+        <span>Tasks</span>
+      </a>
+      <a href="#" class="nav-item" data-page="news">
+        <i data-lucide="newspaper"></i>
+        <span>News</span>
+      </a>
+      <a href="#" class="nav-item" data-page="settings">
+        <i data-lucide="settings"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    
+    <!-- Home Page -->
+    <div id="homePage" class="page active">
+      <div class="page-header">
+        <h1>My Bookmarks</h1>
+        <div class="project-search-wrapper" style="max-width: 400px;">
+          <i data-lucide="search" class="project-search-icon"></i>
+          <input type="text" id="searchBox" class="form-control project-search-input" placeholder="Search bookmarks, URLs, notes, tags...">
+          <button id="searchClear" class="project-search-clear" style="display:none;" title="Clear search">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <button class="btn btn-primary" id="addSectionBtn">
+          <i data-lucide="plus"></i>
+          Add Section
+        </button>
+      </div>
+      <div id="sectionsContainer" class="sections-container"></div>
+    </div>
+
+    <!-- News Page -->
+    <div id="newsPage" class="page">
+      <div class="page-header">
+        <h1>News & Updates</h1>
+      </div>
+
+      <div class="news-container">
+        <!-- RSS Feeds Section -->
+        <div class="news-section">
+          <div class="news-section-header">
+            <h2>RSS Feeds</h2>
+            <button id="rssManageBtn" class="btn btn-small">&#9881; Manage</button>
+          </div>
+          <div class="news-tabs-container" id="rssFeedsContainer"></div>
+          <div id="rssContent" class="news-content">
+            <div class="loading">Select a feed to start</div>
+          </div>
+        </div>
+
+        <!-- Reddit Section -->
+        <div class="news-section">
+          <div class="news-section-header">
+            <h2>Reddit</h2>
+            <button id="redditManageBtn" class="btn btn-small">&#9881; Manage</button>
+          </div>
+          <div class="news-tabs-container" id="redditTabsContainer"></div>
+          <div id="redditContent" class="news-content">
+            <div class="loading">Select a subreddit to start</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Projects Page -->
+    <div id="projectsPage" class="page">
+      <div class="page-header">
+        <h1>Projects</h1>
+        <div class="projects-header-right">
+          <div class="view-toggle" id="projectsViewToggle">
+            <button class="view-btn pview-btn active" data-pview="kanban" title="Kanban View">
+              <i data-lucide="layout-dashboard"></i>
+              <span>Kanban</span>
+            </button>
+            <button class="view-btn pview-btn" data-pview="table" title="Table View">
+              <i data-lucide="table"></i>
+              <span>Table</span>
+            </button>
+          </div>
+          <button class="btn btn-primary" id="newProjectCardBtn">
+            <i data-lucide="plus"></i>
+            New Project
+          </button>
+        </div>
+      </div>
+      <div class="project-search-bar">
+        <div class="project-search-wrapper">
+          <i data-lucide="search" class="project-search-icon"></i>
+          <input type="text" id="projectsSearchBox" class="form-control project-search-input" placeholder="Filter projects by name, description, or tags...">
+          <button id="projectsSearchClear" class="project-search-clear" style="display:none;" title="Clear search">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div id="projectsSearchMeta" class="project-search-meta"></div>
+        <label class="hide-done-label">
+          <input type="checkbox" id="hideCompletedToggle" class="hide-done-check">
+          <span>Hide Completed</span>
+        </label>
+        <label class="hide-done-label">
+          <input type="checkbox" id="hideArchivedToggle" class="hide-done-check">
+          <span>Hide Archived</span>
+        </label>
+      </div>
+      <div id="projectKanbanView">
+        <div id="projectCardsContainer" class="projects-kanban-board"></div>
+      </div>
+      <div id="projectTableView" style="display:none;">
+        <div id="projectTableContainer" class="task-table-wrapper"></div>
+      </div>
+    </div>
+
+    <!-- Tasks Page -->
+    <div id="tasksPage" class="page">
+      <div class="page-header">
+        <div class="projects-header-left">
+          <h1>Tasks</h1>
+          <select id="projectSelector" class="form-control project-selector"></select>
+        </div>
+        <div class="projects-header-right">
+          <div class="view-toggle">
+            <button class="view-btn active" data-view="kanban" title="Kanban View">
+              <i data-lucide="layout-dashboard"></i>
+              <span>Kanban</span>
+            </button>
+            <button class="view-btn" data-view="table" title="Table View">
+              <i data-lucide="table"></i>
+              <span>Table</span>
+            </button>
+          </div>
+          <button class="btn btn-primary" id="addTaskBtn">
+            <i data-lucide="plus"></i>
+            Add Task
+          </button>
+        </div>
+      </div>
+
+      <!-- Task search bar -->
+      <div class="project-search-bar">
+        <div class="project-search-wrapper">
+          <i data-lucide="search" class="project-search-icon"></i>
+          <input type="text" id="projectSearchBox" class="form-control project-search-input" placeholder="Filter tasks by title, notes, or tags...">
+          <button id="projectSearchClear" class="project-search-clear" style="display:none;" title="Clear search">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div id="projectSearchMeta" class="project-search-meta"></div>
+        <label class="hide-done-label">
+          <input type="checkbox" id="hideDoneToggle" class="hide-done-check">
+          <span>Hide Completed</span>
+        </label>
+      </div>
+      <div id="kanbanView" class="kanban-view">
+        <div id="kanbanBoard" class="kanban-board"></div>
+      </div>
+      <div id="tableView" class="table-view" style="display:none;">
+        <div id="taskTable" class="task-table-wrapper"></div>
+      </div>
+    </div>
+
+    <!-- Settings Page -->
+    <div id="settingsPage" class="page">
+      <div class="page-header">
+        <h1>Settings</h1>
+      </div>
+      <div class="settings-content">
+        <div class="setting-group">
+          <h3>Theme</h3>
+          <select id="themeSelect" class="form-control">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="nordic">Nordic</option>
+            <option value="catppuccin">Catppuccin</option>
+            <option value="dracula">Dracula</option>
+            <option value="solarized">Solarized</option>
+            <option value="cyberpunk">Cyberpunk</option>
+            <option value="peanutbutter">Peanut Butter</option>
+            <option value="custom">Custom</option>
+          </select>
+          
+          <!-- Custom Theme Colors -->
+          <div id="customThemeColors" style="display: none; margin-top: 20px;">
+            <h4 style="margin-bottom: 15px;">Customize Colors</h4>
+            
+            <div class="color-picker-group">
+              <label for="customBgPrimary">Background Color</label>
+              <input type="color" id="customBgPrimary" class="color-picker" value="#1a1a2e">
+            </div>
+            
+            <div class="color-picker-group">
+              <label for="customBgSecondary">Section Card & Sidebar Color</label>
+              <input type="color" id="customBgSecondary" class="color-picker" value="#16213e">
+            </div>
+            
+            <div class="color-picker-group">
+              <label for="customBgTertiary">Bookmark Card Color</label>
+              <input type="color" id="customBgTertiary" class="color-picker" value="#0f1419">
+            </div>
+            
+            <div class="color-picker-group">
+              <label for="customTextPrimary">Text Color</label>
+              <input type="color" id="customTextPrimary" class="color-picker" value="#eaeaea">
+            </div>
+            
+            <div class="color-picker-group">
+              <label for="customAccent">Accent Color (Badge, Buttons, Lines)</label>
+              <input type="color" id="customAccent" class="color-picker" value="#0ea5e9">
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+              <button id="applyCustomTheme" class="btn btn-primary">Apply Custom Theme</button>
+              <button id="resetCustomTheme" class="btn btn-secondary">Reset to Default</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>Data Management</h3>
+          <button id="exportDataBtn" class="btn btn-primary">Export Data</button>
+          <button id="importDataBtn" class="btn btn-secondary">Import Data</button>
+          <input type="file" id="importFileInput" style="display: none;" accept=".json">
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+          <button id="clearAllDataBtn" class="btn btn-danger" style="background: #ef4444; color: white;">Clear All Data</button>
+          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px;">⚠️ This will permanently delete all bookmarks, projects, and tasks. Export your data first!</p>
+        </div>
+
+        <div class="setting-group">
+          <h3>About</h3>
+          <img src="logo.png" alt="Dashboard" class="about-logo">
+          <p>The PB Dashboard</p>
+          <p>Version 2.0</p>
+          <p>A self hosted bookmark and project tracking dashboard.</p>
+          <p><em>For my team</em></p>
+          <p>Author: Raf</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="modal" id="addSectionModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add Section</h2>
+        <button class="modal-close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="sectionName">Section Name</label>
+          <input type="text" id="sectionName" class="form-control" placeholder="e.g., Work, Personal">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelSectionBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveSectionBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bookmark Modal -->
+  <div class="modal" id="bookmarkModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="bookmarkModalTitle">Add Bookmark</h2>
+        <button class="modal-close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="bookmarkName">Name</label>
+          <input type="text" id="bookmarkName" class="form-control" placeholder="Bookmark name">
+        </div>
+        <div class="form-group">
+          <label for="bookmarkUrl">URL</label>
+          <input type="url" id="bookmarkUrl" class="form-control" placeholder="https://example.com">
+        </div>
+        <div class="form-group">
+          <label for="bookmarkIcon">Icon/Logo (optional)</label>
+          <div class="icon-upload-wrapper">
+            <input type="file" id="bookmarkIcon" class="form-control" accept="image/*">
+            <div id="iconPreview" class="icon-preview">
+              <button type="button" class="icon-remove-btn" id="removeIconBtn" title="Remove icon">&times;</button>
+            </div>
+          </div>
+          <small style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px; display: block;">Square images work best</small>
+        </div>
+        <div class="form-group">
+          <label for="bookmarkNotes">Notes (optional)</label>
+          <textarea id="bookmarkNotes" class="form-control" placeholder="Add notes about this bookmark" rows="4"></textarea>
+          <small style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px; display: block;">⚠️ Don't store passwords or sensitive information in notes</small>
+        </div>
+        <div class="form-group">
+          <label for="bookmarkTags">Tags (optional)</label>
+          <input type="text" id="bookmarkTags" class="form-control" placeholder="e.g. work, urgent, reference">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelBookmarkBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveBookmarkBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RSS Settings Modal -->
+  <div class="modal" id="rssSettingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Manage RSS Feeds</h2>
+        <button class="modal-close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="morning-coffee-info">
+          <h3>&#9749; Morning Coffee</h3>
+          <p>The Morning Coffee tab aggregates the top 3 most recent articles from all your RSS feeds, giving you a quick daily digest.</p>
+        </div>
+        
+        <h3 style="margin-top: 20px;">Your RSS Feeds</h3>
+        <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+          Click on a feed name to edit it. Each feed gets its own tab.
+        </p>
+        <div id="newsFeedsList" class="feeds-list"></div>
+        <div class="form-group" style="margin-top: 20px;">
+          <input type="url" id="newFeedInput" class="form-control" placeholder="Paste RSS feed URL">
+          <button id="addFeedBtn" class="btn btn-primary" style="margin-top: 8px;">Add Feed</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reddit Settings Modal -->
+  <div class="modal" id="redditSettingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Manage Reddit Subreddits</h2>
+        <button class="modal-close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <h3>Added Subreddits</h3>
+        <div id="redditSubsList" class="feeds-list"></div>
+        <div class="form-group" style="margin-top: 20px;">
+          <input type="text" id="newRedditInput" class="form-control" placeholder="e.g., cybersecurity (without r/)">
+          <button id="addRedditBtn" class="btn btn-primary" style="margin-top: 8px;">Add Subreddit</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Modal -->
+  <div class="modal" id="taskModal">
+    <div class="modal-content modal-xl">
+      <div class="modal-header">
+        <h2 id="taskModalTitle">Add Task</h2>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body task-modal-body">
+        <div class="task-form-grid">
+          <div class="task-form-main">
+            <div class="form-group">
+              <label for="taskTitle">Title *</label>
+              <input type="text" id="taskTitle" class="form-control" placeholder="Task title">
+            </div>
+            <div class="form-group">
+              <label for="taskNotes">Notes</label>
+              <textarea id="taskNotes" class="form-control" rows="5" placeholder="Add notes, context, or details..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>To-Do List</label>
+              <div id="todoList" class="todo-list"></div>
+              <div class="todo-add-row">
+                <input type="text" id="newTodoInput" class="form-control" placeholder="Add a to-do item...">
+                <button type="button" class="btn btn-secondary" id="addTodoItemBtn">Add</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Folder Reference</label>
+              <div class="folder-path-row">
+                <input type="text" id="taskFolderPath" class="form-control" placeholder="Paste folder path (e.g. C:\Projects\MyTask or \\server\share)">
+                <button type="button" class="btn btn-secondary" id="openTaskFolderBtn" title="Open folder" style="display:none;">
+                  <i data-lucide="folder-open"></i> Open
+                </button>
+                <button type="button" class="btn btn-secondary" id="clearTaskFolderBtn" title="Clear path" style="display:none;">
+                  <i data-lucide="x"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="task-form-sidebar">
+            <div class="form-group">
+              <label for="taskStatus">Status</label>
+              <select id="taskStatus" class="form-control"></select>
+            </div>
+            <div class="form-group">
+              <label for="taskPriority">Priority</label>
+              <select id="taskPriority" class="form-control">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="taskDueDate">Due Date</label>
+              <input type="date" id="taskDueDate" class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="taskTags">Tags</label>
+              <input type="text" id="taskTags" class="form-control" placeholder="e.g. bug, feature, docs">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelTaskBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveTaskBtn">Save Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Project Modal -->
+  <div class="modal" id="manageProjectModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Manage Projects</h2>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="projectList" class="feeds-list" style="margin-bottom: 20px;"></div>
+        <div class="form-group">
+          <label>New Project</label>
+          <input type="text" id="newProjectName" class="form-control" placeholder="Project name">
+        </div>
+        <button class="btn btn-primary" id="createProjectBtn" style="margin-top: 8px;">Create Project</button>
+
+        <hr style="border-color: var(--border); margin: 24px 0;">
+
+        <div id="editColumnsSection">
+          <h4 style="margin-bottom: 12px; color: var(--text-primary);">Columns for selected project</h4>
+          <div id="columnsList" class="feeds-list" style="margin-bottom: 12px;"></div>
+          <div class="todo-add-row">
+            <input type="text" id="newColumnInput" class="form-control" placeholder="New column name">
+            <button class="btn btn-secondary" id="addColumnBtn">Add</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit / New Project Modal -->
+  <div class="modal" id="editProjectModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="editProjectModalTitle">New Project</h2>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="editProjectName">Project Name *</label>
+          <input type="text" id="editProjectName" class="form-control" placeholder="e.g. Website Redesign">
+        </div>
+        <div class="form-group">
+          <label for="editProjectDescription">Description (optional)</label>
+          <textarea id="editProjectDescription" class="form-control" rows="3" placeholder="What is this project about?"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="editProjectNotes">Notes (optional)</label>
+          <textarea id="editProjectNotes" class="form-control" rows="3" placeholder="Notes, links, context..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="editProjectDueDate">Due Date (optional)</label>
+          <input type="date" id="editProjectDueDate" class="form-control">
+        </div>
+        <div class="form-group">
+          <label for="editProjectStatus">Status</label>
+          <select id="editProjectStatus" class="form-control">
+            <option value="Planning">Planning</option>
+            <option value="Active">Active</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Completed">Completed</option>
+            <option value="Archived">Archived</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="editProjectTags">Tags (optional)</label>
+          <input type="text" id="editProjectTags" class="form-control" placeholder="e.g. client, urgent, web">
+        </div>
+        <div class="form-group">
+          <label>Folder Reference (optional)</label>
+          <div class="folder-path-row">
+            <input type="text" id="editProjectFolderPath" class="form-control" placeholder="Paste folder path (e.g. C:\Projects\MyProject or \\server\share)">
+            <button type="button" class="btn btn-secondary" id="openProjectFolderBtn" title="Open folder" style="display:none;">
+              <i data-lucide="folder-open"></i> Open
+            </button>
+            <button type="button" class="btn btn-secondary" id="clearProjectFolderBtn" title="Clear path" style="display:none;">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelEditProjectBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveEditProjectBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Project Modal -->
+  <div class="modal" id="exportProjectModal">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h2>Export Project</h2>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 20px; color: var(--text-secondary);">Choose the export format:</p>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button class="btn btn-primary" id="exportHtmlBtn" style="width: 100%;">
+            <i data-lucide="globe"></i>
+            <span>HTML (Opens in browser)</span>
+          </button>
+          <button class="btn btn-primary" id="exportMarkdownBtn" style="width: 100%;">
+            <i data-lucide="file-text"></i>
+            <span>Markdown (For Obsidian/notes)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="script.js"></script>
+</body>
+</html>
