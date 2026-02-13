@@ -1,6 +1,13 @@
 # Homepage Dashboard
 
-Open `index.html` in any browser. Everything runs offline, all data saves to localStorage automatically.
+## Installation
+
+1. Go to [Releases](https://github.com/Nexroth/pb-dashboard/releases)
+2. Download the latest `pb-dashboard.zip`
+3. Extract the ZIP file
+4. Open `index.html` in any browser
+
+Everything runs offline, all data saves to localStorage automatically.
 
 ## Pages
 
@@ -51,8 +58,11 @@ The application blocks javascript: URLs in bookmarks and sanitizes all user inpu
 - `index.html` — page structure
 - `script.js` — all logic
 - `styles.css` — themes and layout
+- `logo.png` — dashboard logo
+- `favicon.png` — browser icon
+- `README.md` — this file
 - `Customization.txt` — how to set up feeds, themes, and other options
-- `README.md` - this file
+- `Security_Audit.md` — security review and XSS protection details
 
 ## Tech
 
