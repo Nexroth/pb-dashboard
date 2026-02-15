@@ -37,6 +37,16 @@ Tasks have a priority level (Low / Medium / High / Critical), optional due date,
 
 Switch between kanban and table view with the toggle at the top right. `Alt+T` opens the add-task modal. Right-click a task card to view notes and todos, edit, open the folder, or delete.
 
+### Calendar
+
+Implemented a calendar page. Currently displays a monthly view with the projects and tasks for the month. 
+
+Displays selected project or task on a right side bar. 
+
+Added US holidays to calendar.
+
+More features coming with V2.2.0 
+
 ### News
 
 Two sections: RSS feeds and Reddit.
@@ -63,6 +73,8 @@ The application blocks javascript: URLs in bookmarks and sanitizes all user inpu
 - `README.md` — this file
 - `Customization.txt` — how to set up feeds, themes, and other options
 - `Security_Audit.md` — security review and XSS protection details
+- `manifest.json` — initial implementation for PWA
+
 
 ## Tech
 
