@@ -1,5 +1,5 @@
 // Dashboard version
-const DASHBOARD_VERSION = '2.1.0';
+const DASHBOARD_VERSION = '2.1.5';
 
 // Default news feeds
 const DEFAULT_FEEDS = [
@@ -397,7 +397,10 @@ function initializeEventListeners() {
   // Modal close buttons
   document.querySelectorAll('.modal-close').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      e.target.closest('.modal').classList.remove('active');
+      const modal = btn.closest('.modal');
+      if (modal) {
+        modal.classList.remove('active');
+      }
     });
   });
 
@@ -484,6 +487,29 @@ function initializeEventListeners() {
   const versionEl = document.getElementById('currentVersion');
   if (versionEl) {
     versionEl.textContent = DASHBOARD_VERSION;
+  }
+  
+  // Sidebar footer handlers
+  const sidebarVersion = document.getElementById('sidebarVersion');
+  if (sidebarVersion) {
+    sidebarVersion.addEventListener('click', () => {
+      switchPage('settings');
+      // Scroll to update checker section
+      setTimeout(() => {
+        const updateSection = document.querySelector('.setting-group:has(#checkUpdatesBtn)');
+        if (updateSection) {
+          updateSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    });
+  }
+  
+  const sidebarHelpBtn = document.getElementById('sidebarHelpBtn');
+  if (sidebarHelpBtn) {
+    sidebarHelpBtn.addEventListener('click', () => {
+      showToast('Keyboard shortcuts panel coming in v2.2.0!');
+      // TODO: Open keyboard shortcuts panel when implemented in Phase 1
+    });
   }
 }
 
@@ -611,6 +637,9 @@ function switchPage(pageName) {
   }
   if (pageName === 'tasks') {
     initTasksPage();
+  }
+  if (pageName === 'calendar') {
+    initCalendarPage();
   }
 }
 
@@ -2137,6 +2166,7 @@ function renderProjectsKanban() {
           const newStatus = evt.to.dataset.status;
           const proj = dashboardData.projects.find(p => p.id === projId);
           if (!proj) return;
+          
           // Completed guard
           if (newStatus === 'Completed') {
             const incomplete = proj.tasks.filter(t => t.status !== 'Completed' && t.status !== 'Done').length;
@@ -2146,7 +2176,30 @@ function renderProjectsKanban() {
               return;
             }
           }
+          
+          // Update status if changed
           proj.status = newStatus;
+          
+          // Update order in dashboardData.projects array
+          // Get all project IDs in their new DOM order
+          const allCardElements = document.querySelectorAll('.project-card');
+          const newOrder = Array.from(allCardElements).map(card => card.dataset.projectId);
+          
+          // Reorder dashboardData.projects to match DOM order
+          const reorderedProjects = [];
+          newOrder.forEach(id => {
+            const project = dashboardData.projects.find(p => p.id === id);
+            if (project) reorderedProjects.push(project);
+          });
+          
+          // Add any projects not in DOM (shouldn't happen, but safety check)
+          dashboardData.projects.forEach(p => {
+            if (!reorderedProjects.find(rp => rp.id === p.id)) {
+              reorderedProjects.push(p);
+            }
+          });
+          
+          dashboardData.projects = reorderedProjects;
           saveData();
           renderProjectsKanban();
         }
@@ -3663,4 +3716,391 @@ function formatDate(dateStr) {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-');
   return `${m}/${d}/${y.slice(2)}`;
+}
+
+
+// ==================== CALENDAR VIEW ====================
+
+let currentCalendarDate = new Date();
+let selectedCalendarDate = null;
+
+function initCalendarPage() {
+  // Set up event listeners for calendar controls
+  document.getElementById('calendarPrevBtn').onclick = () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+    renderCalendar();
+  };
+  
+  document.getElementById('calendarNextBtn').onclick = () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+    renderCalendar();
+  };
+  
+  document.getElementById('calendarTodayBtn').onclick = () => {
+    currentCalendarDate = new Date();
+    renderCalendar();
+  };
+  
+  document.getElementById('calendarSidebarClose').onclick = () => {
+    document.getElementById('calendarSidebar').classList.remove('active');
+    selectedCalendarDate = null;
+    renderCalendar();
+  };
+  
+  // Initial render
+  renderCalendar();
+  setTimeout(() => lucide.createIcons(), 0);
+}
+
+function renderCalendar() {
+  const year = currentCalendarDate.getFullYear();
+  const month = currentCalendarDate.getMonth();
+  
+  // Update month/year display
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  document.getElementById('calendarMonthYear').textContent = `${monthNames[month]} ${year}`;
+  
+  // Get first day of month and total days
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  
+  // Get today's date for comparison
+  const today = new Date();
+  const isToday = (d) => {
+    return d.getDate() === today.getDate() &&
+           d.getMonth() === today.getMonth() &&
+           d.getFullYear() === today.getFullYear();
+  };
+  
+  // Collect all events (projects and tasks with due dates)
+  const events = getCalendarEvents();
+  
+  // Build calendar grid
+  const daysContainer = document.getElementById('calendarDays');
+  daysContainer.innerHTML = '';
+  
+  // Previous month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const day = daysInPrevMonth - i;
+    const date = new Date(year, month - 1, day);
+    daysContainer.appendChild(createDayCell(date, true, events, isToday(date)));
+  }
+  
+  // Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    daysContainer.appendChild(createDayCell(date, false, events, isToday(date)));
+  }
+  
+  // Next month days to fill grid
+  const totalCells = daysContainer.children.length;
+  const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let day = 1; day <= remainingCells; day++) {
+    const date = new Date(year, month + 1, day);
+    daysContainer.appendChild(createDayCell(date, true, events, isToday(date)));
+  }
+  
+  setTimeout(() => lucide.createIcons(), 0);
+}
+
+function getHolidayForDate(date) {
+  const month = date.getMonth();
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const dayOfWeek = date.getDay();
+  
+  // Fixed date holidays
+  const fixedHolidays = {
+    '0-1': "New Year's Day",
+    '0-6': 'Epiphany',
+    '1-2': 'Groundhog Day',
+    '1-14': "Valentine's Day",
+    '2-17': "St. Patrick's Day",
+    '3-1': "April Fools' Day",
+    '3-22': 'Earth Day',
+    '4-5': 'Cinco de Mayo',
+    '5-14': 'Flag Day',
+    '5-19': 'Juneteenth',
+    '6-4': 'Independence Day',
+    '9-31': 'Halloween',
+    '10-11': "Veterans Day",
+    '11-24': 'Christmas Eve',
+    '11-25': 'Christmas',
+    '11-31': "New Year's Eve"
+  };
+  
+  const key = `${month}-${day}`;
+  if (fixedHolidays[key]) return fixedHolidays[key];
+  
+  // Floating holidays (nth weekday of month)
+  // MLK Day - 3rd Monday of January
+  if (month === 0 && dayOfWeek === 1 && day >= 15 && day <= 21) {
+    return 'MLK Day';
+  }
+  
+  // Presidents Day - 3rd Monday of February
+  if (month === 1 && dayOfWeek === 1 && day >= 15 && day <= 21) {
+    return "Presidents' Day";
+  }
+  
+  // Memorial Day - Last Monday of May
+  if (month === 4 && dayOfWeek === 1 && day >= 25) {
+    return 'Memorial Day';
+  }
+  
+  // Labor Day - 1st Monday of September
+  if (month === 8 && dayOfWeek === 1 && day <= 7) {
+    return 'Labor Day';
+  }
+  
+  // Columbus Day - 2nd Monday of October
+  if (month === 9 && dayOfWeek === 1 && day >= 8 && day <= 14) {
+    return 'Columbus Day';
+  }
+  
+  // Thanksgiving - 4th Thursday of November
+  if (month === 10 && dayOfWeek === 4 && day >= 22 && day <= 28) {
+    return 'Thanksgiving';
+  }
+  
+  // Easter (simplified calculation - works for 2020-2030)
+  const easterDates = {
+    2024: new Date(2024, 2, 31), // March 31
+    2025: new Date(2025, 3, 20), // April 20
+    2026: new Date(2026, 3, 5),  // April 5
+    2027: new Date(2027, 2, 28), // March 28
+    2028: new Date(2028, 3, 16), // April 16
+    2029: new Date(2029, 3, 1),  // April 1
+    2030: new Date(2030, 3, 21)  // April 21
+  };
+  
+  if (easterDates[year]) {
+    const easter = easterDates[year];
+    if (date.getMonth() === easter.getMonth() && date.getDate() === easter.getDate()) {
+      return 'Easter';
+    }
+  }
+  
+  // Mother's Day - 2nd Sunday of May
+  if (month === 4 && dayOfWeek === 0 && day >= 8 && day <= 14) {
+    return "Mother's Day";
+  }
+  
+  // Father's Day - 3rd Sunday of June
+  if (month === 5 && dayOfWeek === 0 && day >= 15 && day <= 21) {
+    return "Father's Day";
+  }
+  
+  return null;
+}
+
+function createDayCell(date, isOtherMonth, events, isToday) {
+  const cell = document.createElement('div');
+  cell.className = 'calendar-day';
+  if (isOtherMonth) cell.classList.add('other-month');
+  if (isToday) cell.classList.add('today');
+  
+  // Check if this date is selected
+  if (selectedCalendarDate && 
+      date.getDate() === selectedCalendarDate.getDate() &&
+      date.getMonth() === selectedCalendarDate.getMonth() &&
+      date.getFullYear() === selectedCalendarDate.getFullYear()) {
+    cell.classList.add('selected');
+  }
+  
+  // Check for holidays
+  const holiday = getHolidayForDate(date);
+  if (holiday) {
+    cell.classList.add('has-holiday');
+    cell.title = holiday;
+  }
+  
+  // Day number
+  const dayNumber = document.createElement('div');
+  dayNumber.className = 'calendar-day-number';
+  dayNumber.textContent = date.getDate();
+  
+  // Add holiday indicator
+  if (holiday) {
+    const holidayIndicator = document.createElement('div');
+    holidayIndicator.className = 'calendar-holiday-indicator';
+    holidayIndicator.textContent = holiday;
+    dayNumber.appendChild(holidayIndicator);
+  }
+  
+  cell.appendChild(dayNumber);
+  
+  // Events for this day
+  const eventsContainer = document.createElement('div');
+  eventsContainer.className = 'calendar-events';
+  
+  const dayEvents = events.filter(event => {
+    const eventDate = new Date(event.dueDate);
+    return eventDate.getDate() === date.getDate() &&
+           eventDate.getMonth() === date.getMonth() &&
+           eventDate.getFullYear() === date.getFullYear();
+  });
+  
+  // Show up to 3 events, then "+X more"
+  const maxVisible = 3;
+  dayEvents.slice(0, maxVisible).forEach(event => {
+    const eventEl = document.createElement('div');
+    eventEl.className = `calendar-event event-${event.type}`;
+    if (event.isOverdue) eventEl.className = 'calendar-event event-overdue';
+    eventEl.textContent = event.title;
+    eventEl.title = event.title; // Tooltip for full text
+    eventsContainer.appendChild(eventEl);
+  });
+  
+  if (dayEvents.length > maxVisible) {
+    const moreEl = document.createElement('div');
+    moreEl.className = 'calendar-event-more';
+    moreEl.textContent = `+${dayEvents.length - maxVisible} more`;
+    eventsContainer.appendChild(moreEl);
+  }
+  
+  cell.appendChild(eventsContainer);
+  
+  // Click handler to show events sidebar
+  cell.onclick = () => {
+    selectedCalendarDate = new Date(date);
+    showEventsSidebar(date, dayEvents);
+    renderCalendar(); // Re-render to update selection
+  };
+  
+  return cell;
+}
+
+function getCalendarEvents() {
+  const events = [];
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  
+  if (!dashboardData.projects) return events;
+  
+  // Add projects with due dates
+  dashboardData.projects.forEach(project => {
+    if (project.dueDate) {
+      const dueDate = new Date(project.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      const isOverdue = dueDate < now && project.status !== 'Completed' && project.status !== 'Archived';
+      
+      events.push({
+        type: 'project',
+        title: project.name,
+        dueDate: project.dueDate,
+        status: project.status,
+        isOverdue: isOverdue,
+        data: project
+      });
+    }
+    
+    // Add tasks with due dates
+    if (project.tasks) {
+      project.tasks.forEach(task => {
+        if (task.dueDate) {
+          const dueDate = new Date(task.dueDate);
+          dueDate.setHours(0, 0, 0, 0);
+          const isOverdue = dueDate < now && task.status !== 'Done' && task.status !== 'Completed';
+          
+          events.push({
+            type: 'task',
+            title: task.title,
+            dueDate: task.dueDate,
+            status: task.status,
+            projectName: project.name,
+            isOverdue: isOverdue,
+            data: task
+          });
+        }
+      });
+    }
+  });
+  
+  return events;
+}
+
+function showEventsSidebar(date, events) {
+  const sidebar = document.getElementById('calendarSidebar');
+  const dateTitle = document.getElementById('calendarSidebarDate');
+  const content = document.getElementById('calendarSidebarContent');
+  
+  // Format date
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  dateTitle.textContent = `${dayNames[date.getDay()]}, ${monthNames[date.getMonth()]} ${date.getDate()}`;
+  
+  // Show sidebar
+  sidebar.classList.add('active');
+  
+  // Render events
+  if (events.length === 0) {
+    content.innerHTML = '<p class="calendar-empty-message">No events on this day</p>';
+    return;
+  }
+  
+  // Sort events: overdue first, then by type (projects, then tasks)
+  events.sort((a, b) => {
+    if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+    if (a.type !== b.type) return a.type === 'project' ? -1 : 1;
+    return a.title.localeCompare(b.title);
+  });
+  
+  content.innerHTML = events.map(event => {
+    const itemClass = `calendar-event-item item-${event.type} ${event.isOverdue ? 'item-overdue' : ''}`;
+    const typeLabel = event.type === 'project' ? 'Project' : 'Task';
+    const typeClass = `type-${event.type}`;
+    
+    let metaInfo = `Status: ${escapeHtml(event.status)}`;
+    if (event.type === 'task' && event.projectName) {
+      metaInfo += ` • Project: ${escapeHtml(event.projectName)}`;
+    }
+    if (event.isOverdue) {
+      metaInfo = `<span class="calendar-event-item-status status-overdue">OVERDUE</span>${metaInfo}`;
+    }
+    
+    return `
+      <div class="${itemClass}" data-event-type="${event.type}" data-event-data='${JSON.stringify(event.data).replace(/'/g, "&apos;")}'>
+        <div class="calendar-event-item-header">
+          <div class="calendar-event-item-title">${escapeHtml(event.title)}</div>
+          <div class="calendar-event-item-type ${typeClass}">${typeLabel}</div>
+        </div>
+        <div class="calendar-event-item-meta">${metaInfo}</div>
+      </div>
+    `;
+  }).join('');
+  
+  // Add click handlers to navigate to events
+  content.querySelectorAll('.calendar-event-item').forEach(item => {
+    item.style.cursor = 'pointer';
+    item.onclick = () => {
+      const eventType = item.dataset.eventType;
+      const eventData = JSON.parse(item.dataset.eventData);
+      
+      if (eventType === 'project') {
+        // Navigate to project's tasks
+        dashboardData.activeProjectId = eventData.id;
+        saveData();
+        switchPage('tasks');
+      } else {
+        // Navigate to task's project, then open task modal
+        const project = dashboardData.projects.find(p => 
+          p.tasks && p.tasks.some(t => t.id === eventData.id)
+        );
+        if (project) {
+          dashboardData.activeProjectId = project.id;
+          saveData();
+          switchPage('tasks');
+          setTimeout(() => {
+            openTaskModal(eventData.id);
+          }, 100);
+        }
+      }
+    };
+  });
+  
+  setTimeout(() => lucide.createIcons(), 0);
 }
