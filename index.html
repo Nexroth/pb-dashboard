@@ -2,12 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>PB Dashboard</title>
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="logo.png">
+  
+  <!-- Theme Colors -->
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0ea5e9">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#0ea5e9">
+  
+  <!-- Apple Mobile Web App -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PB Dashboard">
+  
+  <!-- Microsoft -->
+  <meta name="msapplication-TileColor" content="#1a1a2e">
+  <meta name="msapplication-TileImage" content="logo.png">
+  <meta name="msapplication-config" content="none">
+  
+  <!-- Description -->
+  <meta name="description" content="Self-contained bookmark and project management dashboard with calendar, tasks, and news aggregation">
+  <meta name="keywords" content="dashboard, bookmarks, projects, tasks, calendar, productivity">
+  <meta name="author" content="Raf">
+  
+  <!-- Stylesheets -->
   <link rel="stylesheet" href="styles.css">
+  
+  <!-- Scripts -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-  <link rel="icon" type="image/png" href="favicon.png">
 </head>
 <body data-theme="dark">
   <aside class="sidebar">
@@ -47,7 +77,7 @@
       </a>
     </nav>
     <div class="sidebar-footer">
-      <span class="sidebar-version" id="sidebarVersion">v2.1.5</span>
+      <span class="sidebar-version" id="sidebarVersion">v2.2.0</span>
       <button class="sidebar-help-btn" id="sidebarHelpBtn" title="Keyboard shortcuts">
         <i data-lucide="help-circle"></i>
       </button>
@@ -58,8 +88,84 @@
     
     <!-- Home Page -->
     <div id="homePage" class="page active">
+      <!-- Stats Overview Panel -->
+      <div class="stats-overview" id="statsOverview">
+        <div class="stats-header" id="statsHeader">
+          <div class="stats-title">
+            <i data-lucide="bar-chart-3"></i>
+            <h2>Overview</h2>
+          </div>
+          <button class="stats-toggle" id="statsToggle" title="Toggle overview">
+            <i data-lucide="chevron-up"></i>
+          </button>
+        </div>
+        <div class="stats-body" id="statsBody">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">
+                <i data-lucide="bookmark"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value" id="statBookmarks">0</div>
+                <div class="stat-label">Bookmarks</div>
+              </div>
+            </div>
+            
+            <div class="stat-card">
+              <div class="stat-icon">
+                <i data-lucide="folder"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value" id="statActiveProjects">0</div>
+                <div class="stat-label">Active Projects</div>
+              </div>
+            </div>
+            
+            <div class="stat-card">
+              <div class="stat-icon">
+                <i data-lucide="list-todo"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value" id="statPendingTasks">0</div>
+                <div class="stat-label">Pending Tasks</div>
+              </div>
+            </div>
+            
+            <div class="stat-card">
+              <div class="stat-icon">
+                <i data-lucide="percent"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value" id="statCompletionRate">0%</div>
+                <div class="stat-label">Completion Rate</div>
+              </div>
+            </div>
+            
+            <div class="stat-card">
+              <div class="stat-icon">
+                <i data-lucide="alert-triangle"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value" id="statOverdueProjects">0</div>
+                <div class="stat-label">Overdue Projects</div>
+              </div>
+            </div>
+            
+            <div class="stat-card">
+              <div class="stat-icon">
+                <i data-lucide="alert-circle"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value" id="statOverdueTasks">0</div>
+                <div class="stat-label">Overdue Tasks</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <div class="page-header">
-        <h1>My Bookmarks</h1>
+        <h1>Bookmarks</h1>
         <div class="project-search-wrapper" style="max-width: 400px;">
           <i data-lucide="search" class="project-search-icon"></i>
           <input type="text" id="searchBox" class="form-control project-search-input" placeholder="Search bookmarks, URLs, notes, tags...">
@@ -86,7 +192,7 @@
         <div class="news-section">
           <div class="news-section-header">
             <h2>RSS Feeds</h2>
-            <button id="rssManageBtn" class="btn btn-small">&#9881; Manage</button>
+            <button id="rssManageBtn" class="btn btn-small">&#9881; Manage</button>
           </div>
           <div class="news-tabs-container" id="rssFeedsContainer"></div>
           <div id="rssContent" class="news-content">
@@ -98,7 +204,7 @@
         <div class="news-section">
           <div class="news-section-header">
             <h2>Reddit</h2>
-            <button id="redditManageBtn" class="btn btn-small">&#9881; Manage</button>
+            <button id="redditManageBtn" class="btn btn-small">&#9881; Manage</button>
           </div>
           <div class="news-tabs-container" id="redditTabsContainer"></div>
           <div id="redditContent" class="news-content">
@@ -309,6 +415,89 @@
               <button id="applyCustomTheme" class="btn btn-primary">Apply Custom Theme</button>
               <button id="resetCustomTheme" class="btn btn-secondary">Reset to Default</button>
             </div>
+          </div>
+        </div>
+        <!-- Toggle switch for overview: -->
+        <div class="setting-group">
+          <h3>Display Options</h3>
+          <div class="setting-item" onclick="document.getElementById('showStatsOverviewToggle').click()">
+            <div class="setting-label-wrapper">
+              <div class="setting-label-title">Show Stats Overview</div>
+              <div class="setting-label-description">Display statistics panel on Home page</div>
+            </div>
+            <label class="toggle-switch" onclick="event.stopPropagation()">
+              <input type="checkbox" id="showStatsOverviewToggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>Notifications</h3>
+          
+          <div class="setting-item" onclick="document.getElementById('enableNotificationsToggle').click()">
+            <div class="setting-label-wrapper">
+              <div class="setting-label-title">Enable Notifications</div>
+              <div class="setting-label-description">Show in-app reminders for overdue items and upcoming deadlines</div>
+            </div>
+            <label class="toggle-switch" onclick="event.stopPropagation()">
+              <input type="checkbox" id="enableNotificationsToggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          
+          <div id="notificationSettings" style="display: none; margin-top: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border);">
+            
+            <div class="form-group">
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Daily Digest Time</label>
+              <input type="time" id="dailyDigestTime" class="form-control" value="07:00" style="max-width: 150px;">
+              <small style="color: var(--text-secondary); margin-top: 4px; display: block;">Daily summary of tasks and deadlines</small>
+            </div>
+            
+            <div class="form-group" style="margin-top: 16px;">
+              <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Quiet Hours</label>
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <div>
+                  <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Start</label>
+                  <input type="time" id="quietHoursStart" class="form-control" value="19:00" style="max-width: 140px;">
+                </div>
+                <span style="color: var(--text-secondary);">to</span>
+                <div>
+                  <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 4px;">End</label>
+                  <input type="time" id="quietHoursEnd" class="form-control" value="06:59" style="max-width: 140px;">
+                </div>
+              </div>
+              <small style="color: var(--text-secondary); margin-top: 8px; display: block;">No notifications during these hours</small>
+            </div>
+            
+            <div class="form-group" style="margin-top: 16px;">
+              <label style="display: block; margin-bottom: 12px; font-weight: 500; color: var(--text-primary);">Notification Types</label>
+              
+              <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                <input type="checkbox" id="notifyOverdue" checked>
+                <span style="color: var(--text-primary);">Overdue items (checked once daily)</span>
+              </label>
+              
+              <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                <input type="checkbox" id="notifyDailyDigest" checked>
+                <span style="color: var(--text-primary);">Daily digest summary</span>
+              </label>
+              
+              <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                <input type="checkbox" id="notify3DayWarning" checked>
+                <span style="color: var(--text-primary);">3-day deadline warnings</span>
+              </label>
+              
+              <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="notify1DayWarning" checked>
+                <span style="color: var(--text-primary);">1-day deadline warnings</span>
+              </label>
+            </div>
+            
+            <button id="testNotificationBtn" class="btn btn-secondary" style="margin-top: 16px;">
+              <i data-lucide="bell"></i>
+              Send Test Notification
+            </button>
           </div>
         </div>
 

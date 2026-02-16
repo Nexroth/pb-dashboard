@@ -1,11 +1,12 @@
 // Dashboard version
-const DASHBOARD_VERSION = '2.1.5';
+const DASHBOARD_VERSION = '2.2.0';
 
 // Default news feeds
 const DEFAULT_FEEDS = [
   'https://news.ycombinator.com/rss',
-  'https://krebsonsecurity.com/feed/',
-  'https://feeds.feedburner.com/darknethackers',
+  'https://www.bleepingcomputer.com/feed/',
+  'https://krebsonsecurity.com/feed/atom/',
+  'https://www.darkreading.com/rss.xml',
   'https://threatpost.com/feed/',
   'https://www.infosecurity-magazine.com/rss/news/',
   'https://cisoseries.libsyn.com/rss'
@@ -100,6 +101,9 @@ function loadData() {
 function saveData() {
   try {
     localStorage.setItem('dashboardData', JSON.stringify(dashboardData));
+    if (typeof renderStats === 'function') {
+      renderStats();
+    }
   } catch (error) {
     if (error.name === 'QuotaExceededError') {
       alert('Storage quota exceeded! Your data is too large. Consider:\n\n1. Export your data as backup\n2. Remove old bookmarks/projects\n3. Compress or remove large icons');
@@ -179,6 +183,37 @@ function migrateData(data) {
       });
     }
   });
+  // Migrate news feeds to new naming (v2.2.0)
+  if (data.newsFeeds && data.newsFeeds.length > 0) {
+    data.newsFeeds = data.newsFeeds.map(feed => {
+      const url = typeof feed === 'string' ? feed : feed.url;
+      
+      // Update broken feeds
+      if (url === 'https://krebsonsecurity.com/feed/') {
+        return { url: 'https://krebsonsecurity.com/feed/atom/', name: 'Krebs on Security' };
+      }
+      if (url === 'https://feeds.feedburner.com/darknethackers') {
+        return { url: 'https://www.darkreading.com/rss.xml', name: 'Dark Reading' };
+      }
+      
+      // Update names for existing feeds
+      if (typeof feed === 'object' && feed.url) {
+        return {
+          url: feed.url,
+          name: extractFeedName(feed.url) // Use the improved name extraction
+        };
+      }
+      
+      // Convert old string format
+      return {
+        url: url,
+        name: extractFeedName(url)
+      };
+    });
+  }
+  // Add template arrays (v2.2.0)
+  if (!data.projectTemplates) data.projectTemplates = [];
+  if (!data.taskTemplates) data.taskTemplates = [];
 
   return data;
 }
@@ -417,13 +452,24 @@ function initializeEventListeners() {
   document.getElementById('rssManageBtn').addEventListener('click', () => {
     openModal('rssSettingsModal');
     renderNewsFeedsList();
+    const modal = document.getElementById('rssSettingsModal');
+    if (modal) {
+      modal.querySelectorAll('.modal-close').forEach(btn => {
+        btn.onclick = () => closeModal('rssSettingsModal');
+       });
+    }
   });
 
   document.getElementById('redditManageBtn').addEventListener('click', () => {
     openModal('redditSettingsModal');
     renderRedditSubsList();
+    const modal = document.getElementById('redditSettingsModal');
+    if (modal) {
+      modal.querySelectorAll('.modal-close').forEach(btn => {
+        btn.onclick = () => closeModal('redditSettingsModal');
+      });
+    }
   });
-
   document.getElementById('addFeedBtn').addEventListener('click', () => {
     const input = document.getElementById('newFeedInput');
     const url = input.value.trim();
@@ -475,7 +521,7 @@ function initializeEventListeners() {
     });
   }
 
-  document.addEventListener('keydown', handlePasteBookmark);
+  document.addEventListener('keydown', handleKeyboardShortcuts);
   
   // Check for updates button
   const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
@@ -507,11 +553,15 @@ function initializeEventListeners() {
   const sidebarHelpBtn = document.getElementById('sidebarHelpBtn');
   if (sidebarHelpBtn) {
     sidebarHelpBtn.addEventListener('click', () => {
-      showToast('Keyboard shortcuts panel coming in v2.2.0!');
-      // TODO: Open keyboard shortcuts panel when implemented in Phase 1
+      showShortcutsPanel();
     });
   }
-}
+  // Checks
+  checkBackupReminder();
+  initStatsOverview();
+  initNotifications();
+}  
+
 
 function compareVersions(v1, v2) {
   // Normalize versions to [major, minor, patch]
@@ -1421,13 +1471,103 @@ function showToast(message) {
   }, 2000);
 }
 
-function handlePasteBookmark(e) {
-  if (e.target.matches('input, textarea, [contenteditable]')) {
+function handleKeyboardShortcuts(e) {
+  // Don't trigger shortcuts when typing in inputs
+  const isTyping = e.target.matches('input, textarea, [contenteditable]');
+  
+  // ESC - Close modals/panels/unfocus (works everywhere)
+  if (e.key === 'Escape') {
+    // First, check if we're in a search box - unfocus it
+    if (e.target.matches('input[type="search"], input[id*="search" i], input[id*="Search"]')) {
+      e.target.blur();
+    }
+    
+    // Find modal by display style instead of .active class
+    const activeModal = document.querySelector('.modal[style*="display: flex"]');
+    
+    if (activeModal) {
+      closeModal(activeModal.id);
+      return;
+    }
+    
+    const shortcutsPanel = document.querySelector('.shortcuts-panel.active');
+    if (shortcutsPanel) {
+      closeShortcutsPanel();
+      return;
+    }
+    
+    const backupReminder = document.querySelector('.backup-reminder.show');
+    if (backupReminder) {
+      hideBackupReminder();
+      return;
+    }
+    
+    const calendarSidebar = document.getElementById('calendarSidebar');
+    if (calendarSidebar && calendarSidebar.classList.contains('active')) {
+      calendarSidebar.classList.remove('active');
+    }
+    
+    return;
+  }
+  
+  // ? or Shift+/ - Show shortcuts help
+  if (e.key === '?' && !isTyping) {
+    e.preventDefault();
+    showShortcutsPanel();
+    return;
+  }
+  
+  // / - Focus search (but NOT Shift+/)
+  if (e.key === '/' && !e.shiftKey && !isTyping && !e.ctrlKey && !e.altKey) {
+    e.preventDefault();
+    
+    // Find the VISIBLE search box on active page
+    const searchBoxes = [
+      document.getElementById('searchBox'),           // Bookmarks
+      document.getElementById('projectsSearchBox'),   // Projects
+      document.getElementById('projectSearchBox')     // Tasks
+    ];
+    
+    // Find first visible one
+    const searchBox = searchBoxes.find(box => box && box.offsetParent !== null);
+    
+    if (searchBox) {
+      searchBox.focus();
+      searchBox.select();
+    }
     return;
   }
 
-  // Alt+T — quick add task (Tasks page must be active)
-  if (e.altKey && e.key === 't') {
+  
+  // Alt+B - Add bookmark (works from any page)
+  if (e.altKey && e.key === 'b' && !isTyping) {
+    e.preventDefault();
+    if (dashboardData.sections.length > 0) {
+      currentEditingBookmarkId = null;
+      currentEditingSectionId = dashboardData.sections[0].id;
+      document.getElementById('bookmarkModalTitle').textContent = 'Add Bookmark';
+      document.getElementById('bookmarkName').value = '';
+      document.getElementById('bookmarkUrl').value = '';
+      document.getElementById('bookmarkNotes').value = '';
+      document.getElementById('iconPreview').classList.remove('has-image');
+      document.getElementById('bookmarkIcon').value = '';
+      openModal('bookmarkModal');
+      setTimeout(() => document.getElementById('bookmarkName').focus(), 100);
+    } else {
+      showToast('Create a section first');
+    }
+    return;
+  }
+  
+  // Alt+P - Add project (works from any page)
+  if (e.altKey && e.key === 'p' && !isTyping) {
+    e.preventDefault();
+    openEditProjectModal(null);
+    return;
+  }
+  
+  // Alt+T - Add task (Tasks page only)
+  if (e.altKey && e.key === 't' && !isTyping) {
     e.preventDefault();
     const tasksPage = document.getElementById('tasksPage');
     if (tasksPage && tasksPage.classList.contains('active')) {
@@ -1437,10 +1577,11 @@ function handlePasteBookmark(e) {
     }
     return;
   }
-
-  if (e.ctrlKey && e.key === 'v') {
+  
+  // Ctrl+V - Paste URL as bookmark (enhanced)
+  if (e.ctrlKey && e.key === 'v' && !isTyping) {
     e.preventDefault();
-
+    
     navigator.clipboard.readText().then(text => {
       if (text.includes('http://') || text.includes('https://') || text.includes('www.')) {
         if (dashboardData.sections.length > 0) {
@@ -1453,15 +1594,836 @@ function handlePasteBookmark(e) {
           document.getElementById('iconPreview').classList.remove('has-image');
           document.getElementById('bookmarkIcon').value = '';
           openModal('bookmarkModal');
-          document.getElementById('bookmarkName').focus();
+          setTimeout(() => document.getElementById('bookmarkName').focus(), 100);
         } else {
-          alert('Create a section first');
+          showToast('Create a section first');
         }
       }
     });
   }
 }
 
+// Shortcuts Panel
+function showShortcutsPanel() {
+  // Remove existing if any
+  let overlay = document.querySelector('.shortcuts-panel-overlay');
+  let panel = document.querySelector('.shortcuts-panel');
+  
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'shortcuts-panel-overlay';
+    document.body.appendChild(overlay);
+    
+    overlay.onclick = closeShortcutsPanel;
+  }
+  
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'shortcuts-panel';
+    panel.innerHTML = `
+      <div class="shortcuts-panel-header">
+        <h2><i data-lucide="keyboard"></i> Keyboard Shortcuts</h2>
+        <button class="shortcuts-panel-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="shortcuts-panel-body">
+        <div class="shortcuts-section">
+          <div class="shortcuts-section-title">Navigation</div>
+          <div class="shortcut-item">
+            <div class="shortcut-description">Focus search</div>
+            <div class="shortcut-keys"><span class="shortcut-key">/</span></div>
+          </div>
+          <div class="shortcut-item">
+            <div class="shortcut-description">Close modals/panels</div>
+            <div class="shortcut-keys"><span class="shortcut-key">Esc</span></div>
+          </div>
+          <div class="shortcut-item">
+            <div class="shortcut-description">Show this help</div>
+            <div class="shortcut-keys"><span class="shortcut-key">?</span></div>
+          </div>
+        </div>
+        
+        <div class="shortcuts-section">
+          <div class="shortcuts-section-title">Quick Actions</div>
+          <div class="shortcut-item">
+            <div class="shortcut-description">Add bookmark</div>
+            <div class="shortcut-keys"><span class="shortcut-key">Alt</span><span class="shortcut-key">B</span></div>
+          </div>
+          <div class="shortcut-item">
+            <div class="shortcut-description">Add project</div>
+            <div class="shortcut-keys"><span class="shortcut-key">Alt</span><span class="shortcut-key">P</span></div>
+          </div>
+          <div class="shortcut-item">
+            <div class="shortcut-description">Add task (Tasks page only)</div>
+            <div class="shortcut-keys"><span class="shortcut-key">Alt</span><span class="shortcut-key">T</span></div>
+          </div>
+          <div class="shortcut-item">
+            <div class="shortcut-description">Paste URL as bookmark</div>
+            <div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">V</span></div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(panel);
+    
+    panel.querySelector('.shortcuts-panel-close').onclick = closeShortcutsPanel;
+  }
+  
+  overlay.classList.add('active');
+  panel.classList.add('active');
+  
+  lucide.createIcons();
+}
+
+function closeShortcutsPanel() {
+  const overlay = document.querySelector('.shortcuts-panel-overlay');
+  const panel = document.querySelector('.shortcuts-panel');
+  
+  if (overlay) overlay.classList.remove('active');
+  if (panel) panel.classList.remove('active');
+}
+
+// Backup Reminder System
+function checkBackupReminder() {
+  const lastExportDate = localStorage.getItem('lastExportDate');
+  const lastDismissed = localStorage.getItem('lastBackupReminderDismissed');
+  const now = Date.now();
+  
+  // If never exported, don't show reminder yet (give them time to use the app)
+  if (!lastExportDate) return;
+  
+  const daysSinceExport = (now - parseInt(lastExportDate)) / (1000 * 60 * 60 * 24);
+  
+  // Check if dismissed recently (7-day snooze)
+  if (lastDismissed) {
+    const daysSinceDismissed = (now - parseInt(lastDismissed)) / (1000 * 60 * 60 * 24);
+    if (daysSinceDismissed < 7) return; // Still in snooze period
+  }
+  
+  // Show reminder if 30+ days since last export
+  if (daysSinceExport >= 30) {
+    showBackupReminder();
+  }
+}
+
+function showBackupReminder() {
+  // Remove existing reminder if any
+  const existing = document.querySelector('.backup-reminder');
+  if (existing) existing.remove();
+  
+  const reminder = document.createElement('div');
+  reminder.className = 'backup-reminder';
+  
+  reminder.innerHTML = `
+    <div class="backup-reminder-header">
+      <i data-lucide="alert-circle"></i>
+      <span>Backup Reminder</span>
+    </div>
+    <div class="backup-reminder-message">
+      It's been 30+ days since your last backup. Export your data to keep it safe!
+    </div>
+    <div class="backup-reminder-actions">
+      <button class="backup-reminder-btn backup-reminder-btn-primary" id="backupNowBtn">
+        Export Now
+      </button>
+      <button class="backup-reminder-btn backup-reminder-btn-secondary" id="backupLaterBtn">
+        Later
+      </button>
+    </div>
+  `;
+  
+  document.body.appendChild(reminder);
+  
+  // Trigger animation
+  setTimeout(() => {
+    reminder.classList.add('show');
+  }, 100);
+  
+  // Re-render icons
+  lucide.createIcons();
+  
+  // Wire up buttons
+  document.getElementById('backupNowBtn').onclick = () => {
+    hideBackupReminder();
+    // Trigger export
+    document.getElementById('exportDataBtn').click();
+  };
+  
+  document.getElementById('backupLaterBtn').onclick = () => {
+    // Snooze for 7 days
+    localStorage.setItem('lastBackupReminderDismissed', Date.now().toString());
+    hideBackupReminder();
+    showToast('Backup reminder snoozed for 7 days');
+  };
+}
+
+function hideBackupReminder() {
+  const reminder = document.querySelector('.backup-reminder');
+  if (reminder) {
+    reminder.classList.remove('show');
+    setTimeout(() => reminder.remove(), 400);
+  }
+}
+
+function updateLastExportDate() {
+  localStorage.setItem('lastExportDate', Date.now().toString());
+  showToast('Backup date updated');
+}
+
+// Stats Overview System
+function initStatsOverview() {
+  // Load visibility setting (default: true)
+  const showStats = localStorage.getItem('showStatsOverview') !== 'false';
+  
+  // Set toggle state
+  const toggle = document.getElementById('showStatsOverviewToggle');
+  if (toggle) {
+    toggle.checked = showStats;
+    toggle.onchange = toggleStatsOverview;
+  }
+  
+  // Show/hide panel
+  const statsOverview = document.getElementById('statsOverview');
+  if (statsOverview) {
+    statsOverview.style.display = showStats ? 'block' : 'none';
+  }
+  
+  if (!showStats) return; // Don't set up if disabled
+  
+  const statsHeader = document.getElementById('statsHeader');
+  const statsToggle = document.getElementById('statsToggle');
+  
+  if (!statsHeader || !statsToggle) return;
+  
+  // Load collapsed state
+  const isCollapsed = localStorage.getItem('statsCollapsed') === 'true';
+  if (isCollapsed) {
+    statsOverview.classList.add('collapsed');
+  }
+  
+  // Toggle on click
+  const toggleCollapse = () => {
+    statsOverview.classList.toggle('collapsed');
+    const collapsed = statsOverview.classList.contains('collapsed');
+    localStorage.setItem('statsCollapsed', collapsed.toString());
+  };
+  
+  statsHeader.onclick = toggleCollapse;
+  statsToggle.onclick = (e) => {
+    e.stopPropagation();
+    toggleCollapse();
+  };
+  
+  // Initial render
+  renderStats();
+}
+
+function toggleStatsOverview() {
+  const toggle = document.getElementById('showStatsOverviewToggle');
+  const showStats = toggle.checked;
+  
+  localStorage.setItem('showStatsOverview', showStats.toString());
+  
+  const statsOverview = document.getElementById('statsOverview');
+  if (statsOverview) {
+    statsOverview.style.display = showStats ? 'block' : 'none';
+  }
+  
+  if (showStats) {
+    renderStats();
+  }
+  
+  showToast(showStats ? 'Stats Overview enabled' : 'Stats Overview disabled');
+}
+
+function renderStats() {
+  const statsOverview = document.getElementById('statsOverview');
+  if (!statsOverview || statsOverview.style.display === 'none') return;
+  
+  const stats = calculateStats();
+  
+  // SAFETY CHECKS:
+  const bookmarksEl = document.getElementById('statBookmarks');
+  const activeProjectsEl = document.getElementById('statActiveProjects');
+  const pendingTasksEl = document.getElementById('statPendingTasks'); // Changed ID
+  const completionEl = document.getElementById('statCompletionRate');
+  const overdueProjectsEl = document.getElementById('statOverdueProjects');
+  const overdueTasksEl = document.getElementById('statOverdueTasks');
+  
+  if (bookmarksEl) bookmarksEl.textContent = stats.bookmarks;
+  if (activeProjectsEl) activeProjectsEl.textContent = stats.activeProjects;
+  if (pendingTasksEl) pendingTasksEl.textContent = stats.pendingTasks;
+  
+  if (completionEl) {
+    completionEl.textContent = stats.completionRate + '%';
+    completionEl.classList.toggle('stat-success', stats.completionRate === 100);
+  }
+  
+  if (overdueProjectsEl) {
+    overdueProjectsEl.textContent = stats.overdueProjects;
+    overdueProjectsEl.parentElement.classList.toggle('stat-alert', stats.overdueProjects > 0);
+  }
+  
+  if (overdueTasksEl) {
+    overdueTasksEl.textContent = stats.overdueTasks;
+    overdueTasksEl.parentElement.classList.toggle('stat-alert', stats.overdueTasks > 0);
+  }
+}
+
+function calculateStats() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Count bookmarks
+  let bookmarksCount = 0;
+  dashboardData.sections.forEach(section => {
+    if (section.bookmarks) {
+      bookmarksCount += section.bookmarks.length;
+    }
+  });
+  
+  // Count active projects (not Completed or Archived)
+  const activeProjects = dashboardData.projects.filter(p => 
+    p.status !== 'Completed' && p.status !== 'Archived'
+  ).length;
+  
+  // Count tasks
+  let totalTasks = 0;
+  let completedTasks = 0;
+  let overdueTasks = 0;
+  
+  dashboardData.projects.forEach(proj => {
+    if (proj.tasks) {
+      proj.tasks.forEach(task => {
+        totalTasks++;
+        if (task.status === 'Completed') {
+          completedTasks++;
+        }
+        
+        // Check if overdue
+        if (task.dueDate && task.status !== 'Completed') {
+          const [year, month, day] = task.dueDate.split('-').map(Number);
+          const dueDate = new Date(year, month - 1, day);
+          dueDate.setHours(0, 0, 0, 0);
+          
+          if (dueDate < today) {
+            overdueTasks++;
+          }
+        }
+      });
+    }
+  });
+  
+  // Count overdue projects
+  let overdueProjects = 0;
+  dashboardData.projects.forEach(proj => {
+    if (proj.dueDate && proj.status !== 'Completed' && proj.status !== 'Archived') {
+      const [year, month, day] = proj.dueDate.split('-').map(Number);
+      const dueDate = new Date(year, month - 1, day);
+      dueDate.setHours(0, 0, 0, 0);
+      
+      if (dueDate < today) {
+        overdueProjects++;
+      }
+    }
+  });
+  
+  // Calculate completion rate
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  
+  return {
+    bookmarks: bookmarksCount,
+    activeProjects: activeProjects,
+    pendingTasks: totalTasks - completedTasks,
+    completionRate: completionRate,
+    overdueProjects: overdueProjects,
+    overdueTasks: overdueTasks
+  };
+}
+
+// In-App Notification System
+function initNotifications() {
+  // Load settings
+  const notifSettings = getNotificationSettings();
+  
+  // Update UI
+  const enableToggle = document.getElementById('enableNotificationsToggle');
+  const notifPanel = document.getElementById('notificationSettings');
+  
+  if (enableToggle) {
+    enableToggle.checked = notifSettings.enabled;
+    enableToggle.onchange = toggleNotifications;
+    
+    if (notifPanel) {
+      notifPanel.style.display = notifSettings.enabled ? 'block' : 'none';
+    }
+  }
+  
+  // Load saved values into inputs
+  if (document.getElementById('dailyDigestTime')) {
+    document.getElementById('dailyDigestTime').value = notifSettings.dailyDigestTime;
+    document.getElementById('dailyDigestTime').onchange = saveNotificationSettings;
+  }
+  if (document.getElementById('quietHoursStart')) {
+    document.getElementById('quietHoursStart').value = notifSettings.quietHoursStart;
+    document.getElementById('quietHoursStart').onchange = saveNotificationSettings;
+  }
+  if (document.getElementById('quietHoursEnd')) {
+    document.getElementById('quietHoursEnd').value = notifSettings.quietHoursEnd;
+    document.getElementById('quietHoursEnd').onchange = saveNotificationSettings;
+  }
+  
+  // Notification type checkboxes
+  ['notifyOverdue', 'notifyDailyDigest', 'notify3DayWarning', 'notify1DayWarning'].forEach(id => {
+    const checkbox = document.getElementById(id);
+    if (checkbox) {
+      checkbox.checked = notifSettings[id];
+      checkbox.onchange = saveNotificationSettings;
+    }
+  });
+  
+  // Test button
+  const testBtn = document.getElementById('testNotificationBtn');
+  if (testBtn) {
+    testBtn.onclick = showTestNotification;
+  }
+  
+  // Start notification checker if enabled
+  if (notifSettings.enabled) {
+    startNotificationChecker();
+  }
+}
+
+function getNotificationSettings() {
+  const defaults = {
+    enabled: false,
+    dailyDigestTime: '07:00',
+    quietHoursStart: '19:00',
+    quietHoursEnd: '06:59',
+    notifyOverdue: true,
+    notifyDailyDigest: true,
+    notify3DayWarning: true,
+    notify1DayWarning: true,
+    lastDigestDate: null,
+    lastOverdueCheck: null,
+    shownDeadlineWarnings: [] // Track which warnings we've shown
+  };
+  
+  const saved = localStorage.getItem('notificationSettings');
+  if (saved) {
+    return { ...defaults, ...JSON.parse(saved) };
+  }
+  return defaults;
+}
+
+function saveNotificationSettings() {
+  const current = getNotificationSettings();
+  const settings = {
+    enabled: document.getElementById('enableNotificationsToggle')?.checked || false,
+    dailyDigestTime: document.getElementById('dailyDigestTime')?.value || '07:00',
+    quietHoursStart: document.getElementById('quietHoursStart')?.value || '19:00',
+    quietHoursEnd: document.getElementById('quietHoursEnd')?.value || '06:59',
+    notifyOverdue: document.getElementById('notifyOverdue')?.checked || true,
+    notifyDailyDigest: document.getElementById('notifyDailyDigest')?.checked || true,
+    notify3DayWarning: document.getElementById('notify3DayWarning')?.checked || true,
+    notify1DayWarning: document.getElementById('notify1DayWarning')?.checked || true,
+    lastDigestDate: current.lastDigestDate,
+    lastOverdueCheck: current.lastOverdueCheck,
+    shownDeadlineWarnings: current.shownDeadlineWarnings || []
+  };
+  
+  localStorage.setItem('notificationSettings', JSON.stringify(settings));
+  showToast('Notification settings saved');
+}
+
+function toggleNotifications() {
+  const toggle = document.getElementById('enableNotificationsToggle');
+  const panel = document.getElementById('notificationSettings');
+  const enabled = toggle.checked;
+  
+  if (enabled) {
+    panel.style.display = 'block';
+    startNotificationChecker();
+    showToast('In-app notifications enabled');
+  } else {
+    panel.style.display = 'none';
+    stopNotificationChecker();
+    showToast('In-app notifications disabled');
+  }
+  
+  saveNotificationSettings();
+}
+
+let notificationInterval = null;
+
+function startNotificationChecker() {
+  if (notificationInterval) clearInterval(notificationInterval);
+  
+  checkNotifications(); // Check immediately
+  notificationInterval = setInterval(checkNotifications, 60 * 60 * 1000); // Every hour
+}
+
+function stopNotificationChecker() {
+  if (notificationInterval) {
+    clearInterval(notificationInterval);
+    notificationInterval = null;
+  }
+}
+
+function checkNotifications() {
+  const settings = getNotificationSettings();
+  if (!settings.enabled) return;
+  
+  // Check if in quiet hours
+  if (isQuietHours(settings)) return;
+  
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  // Daily digest
+  if (settings.notifyDailyDigest && shouldSendDailyDigest(settings, now)) {
+    showDailyDigest();
+  }
+  
+  // Overdue check (once per day)
+  if (settings.notifyOverdue && shouldCheckOverdue(settings, today)) {
+    checkAndShowOverdue();
+  }
+  
+  // Deadline warnings
+  if (settings.notify3DayWarning || settings.notify1DayWarning) {
+    checkAndShowUpcomingDeadlines(settings, today);
+  }
+}
+
+function isQuietHours(settings) {
+  const now = new Date();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+  
+  const [startHour, startMin] = settings.quietHoursStart.split(':').map(Number);
+  const [endHour, endMin] = settings.quietHoursEnd.split(':').map(Number);
+  
+  const quietStart = startHour * 60 + startMin;
+  const quietEnd = endHour * 60 + endMin;
+  
+  // Handle overnight quiet hours (e.g., 19:00 to 06:59)
+  if (quietStart > quietEnd) {
+    return currentTime >= quietStart || currentTime <= quietEnd;
+  } else {
+    return currentTime >= quietStart && currentTime <= quietEnd;
+  }
+}
+
+function shouldSendDailyDigest(settings, now) {
+  const [digestHour, digestMin] = settings.dailyDigestTime.split(':').map(Number);
+  const currentHour = now.getHours();
+  const currentMin = now.getMinutes();
+  
+  // Check if we're within the digest time window (±30 minutes for flexibility)
+  const isDigestTime = currentHour === digestHour && Math.abs(currentMin - digestMin) <= 30;
+  
+  if (!isDigestTime) return false;
+  
+  // Check if already sent today
+  const lastDigest = settings.lastDigestDate;
+  if (lastDigest) {
+    const lastDate = new Date(lastDigest);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (lastDate >= today) return false;
+  }
+  
+  return true;
+}
+
+function shouldCheckOverdue(settings, today) {
+  const lastCheck = settings.lastOverdueCheck;
+  if (!lastCheck) return true;
+  
+  const lastDate = new Date(lastCheck);
+  return lastDate < today;
+}
+
+function showDailyDigest() {
+  const stats = calculateStats();
+  const settings = getNotificationSettings();
+  
+  // Remove existing notification
+  const existing = document.querySelector('.daily-digest-notification');
+  if (existing) existing.remove();
+  
+  const notification = document.createElement('div');
+  notification.className = 'daily-digest-notification';
+  notification.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 320px;
+    max-width: 400px;
+    z-index: 10002;
+    box-shadow: 0 6px 30px var(--shadow);
+    animation: slideInRight 0.4s ease;
+  `;
+  
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+      <i data-lucide="sun" style="width: 24px; height: 24px; color: var(--accent);"></i>
+      <h3 style="margin: 0; font-size: 16px; color: var(--text-primary);">☀️ Good Morning!</h3>
+    </div>
+    <div style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
+      <div style="margin-bottom: 8px;">📊 <strong>${stats.pendingTasks}</strong> pending tasks</div>
+      <div style="margin-bottom: 8px;">✅ <strong>${stats.completionRate}%</strong> completion rate</div>
+      ${stats.overdueProjects > 0 || stats.overdueTasks > 0 ? `<div style="color: #ef4444; font-weight: 600;">⚠️ ${stats.overdueProjects} overdue projects, ${stats.overdueTasks} overdue tasks</div>` : ''}
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button onclick="this.closest('.daily-digest-notification').remove()" style="flex: 1; padding: 8px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Got it</button>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  lucide.createIcons();
+  
+  // Update last digest date
+  settings.lastDigestDate = new Date().toISOString();
+  localStorage.setItem('notificationSettings', JSON.stringify(settings));
+  
+  // Auto-dismiss after 30 seconds
+  setTimeout(() => {
+    if (notification.parentNode) notification.remove();
+  }, 30000);
+}
+
+function checkAndShowOverdue() {
+  const stats = calculateStats();
+  const settings = getNotificationSettings();
+  
+  const total = stats.overdueProjects + stats.overdueTasks;
+  if (total === 0) {
+    settings.lastOverdueCheck = new Date().toISOString();
+    localStorage.setItem('notificationSettings', JSON.stringify(settings));
+    return;
+  }
+  
+  // Show overdue reminder (similar to backup reminder)
+  const existing = document.querySelector('.overdue-notification');
+  if (existing) existing.remove();
+  
+  const notification = document.createElement('div');
+  notification.className = 'overdue-notification';
+  notification.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-secondary);
+    border: 2px solid #ef4444;
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 320px;
+    max-width: 400px;
+    z-index: 10002;
+    box-shadow: 0 6px 30px var(--shadow);
+    animation: slideInRight 0.4s ease;
+  `;
+  
+  let message = '';
+  if (stats.overdueProjects > 0) {
+    message += `${stats.overdueProjects} overdue project${stats.overdueProjects > 1 ? 's' : ''}`;
+  }
+  if (stats.overdueTasks > 0) {
+    if (message) message += ', ';
+    message += `${stats.overdueTasks} overdue task${stats.overdueTasks > 1 ? 's' : ''}`;
+  }
+  
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+      <i data-lucide="alert-triangle" style="width: 24px; height: 24px; color: #ef4444;"></i>
+      <h3 style="margin: 0; font-size: 16px; color: #ef4444;">⚠️ Overdue Items</h3>
+    </div>
+    <div style="font-size: 14px; color: var(--text-primary); margin-bottom: 16px;">
+      You have ${message}
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button onclick="this.closest('.overdue-notification').remove()" style="flex: 1; padding: 8px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Dismiss</button>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  lucide.createIcons();
+  
+  settings.lastOverdueCheck = new Date().toISOString();
+  localStorage.setItem('notificationSettings', JSON.stringify(settings));
+  
+  // Auto-dismiss after 30 seconds
+  setTimeout(() => {
+    if (notification.parentNode) notification.remove();
+  }, 30000);
+}
+
+function checkAndShowUpcomingDeadlines(settings, today) {
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const in3Days = new Date(today);
+  in3Days.setDate(in3Days.getDate() + 3);
+  
+  const upcomingItems = [];
+  
+  // Get already shown warnings
+  let shownWarnings = settings.shownDeadlineWarnings || [];
+  
+  // Clean up old warnings (older than 7 days)
+  const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+  shownWarnings = shownWarnings.filter(w => w.timestamp > weekAgo);
+  
+  // Check projects
+  dashboardData.projects.forEach(proj => {
+    if (proj.dueDate && proj.status !== 'Completed' && proj.status !== 'Archived') {
+      const [year, month, day] = proj.dueDate.split('-').map(Number);
+      const dueDate = new Date(year, month - 1, day);
+      
+            if (settings.notify1DayWarning && dueDate.getTime() === tomorrow.getTime()) {
+        const warningKey = `proj-${proj.id}-1day`;
+        if (!shownWarnings.find(w => w.key === warningKey)) {
+          upcomingItems.push({ type: 'project', name: proj.name, days: 1 });
+          shownWarnings.push({ key: warningKey, timestamp: Date.now() });
+        }
+      } else if (settings.notify3DayWarning && dueDate.getTime() === in3Days.getTime()) {
+        const warningKey = `proj-${proj.id}-3day`;
+        if (!shownWarnings.find(w => w.key === warningKey)) {
+          upcomingItems.push({ type: 'project', name: proj.name, days: 3 });
+          shownWarnings.push({ key: warningKey, timestamp: Date.now() });
+        }
+      }
+    }
+  });
+  
+  // Check tasks
+  dashboardData.projects.forEach(proj => {
+    if (proj.tasks) {
+      proj.tasks.forEach(task => {
+        if (task.dueDate && task.status !== 'Completed') {
+          const [year, month, day] = task.dueDate.split('-').map(Number);
+          const dueDate = new Date(year, month - 1, day);
+          
+          if (settings.notify1DayWarning && dueDate.getTime() === tomorrow.getTime()) {
+            const warningKey = `task-${task.id}-1day`;
+            if (!shownWarnings.find(w => w.key === warningKey)) {
+              upcomingItems.push({ type: 'task', name: task.title, days: 1 });
+              shownWarnings.push({ key: warningKey, timestamp: Date.now() });
+            }
+          } else if (settings.notify3DayWarning && dueDate.getTime() === in3Days.getTime()) {
+            const warningKey = `task-${task.id}-3day`;
+            if (!shownWarnings.find(w => w.key === warningKey)) {
+              upcomingItems.push({ type: 'task', name: task.title, days: 3 });
+              shownWarnings.push({ key: warningKey, timestamp: Date.now() });
+            }
+          }
+        }
+      });
+    }
+  });
+  
+  // Show notification for each upcoming item (stagger them)
+  upcomingItems.forEach((item, index) => {
+    setTimeout(() => {
+      showDeadlineWarning(item);
+    }, index * 500);
+  });
+  
+  // Save updated warnings
+  settings.shownDeadlineWarnings = shownWarnings;
+  localStorage.setItem('notificationSettings', JSON.stringify(settings));
+}
+
+function showDeadlineWarning(item) {
+  const icon = item.type === 'project' ? '📁' : '📝';
+  
+  const notification = document.createElement('div');
+  notification.className = 'deadline-notification';
+  notification.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-secondary);
+    border: 2px solid #f59e0b;
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 320px;
+    max-width: 400px;
+    z-index: 10002;
+    box-shadow: 0 6px 30px var(--shadow);
+    animation: slideInRight 0.4s ease;
+  `;
+  
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+      <i data-lucide="clock" style="width: 24px; height: 24px; color: #f59e0b;"></i>
+      <h3 style="margin: 0; font-size: 16px; color: #f59e0b;">${icon} Deadline in ${item.days} day${item.days > 1 ? 's' : ''}</h3>
+    </div>
+    <div style="font-size: 14px; color: var(--text-primary); margin-bottom: 16px;">
+      ${item.name}
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button onclick="this.closest('.deadline-notification').remove()" style="flex: 1; padding: 8px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Got it</button>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  lucide.createIcons();
+  
+  // Auto-dismiss after 20 seconds
+  setTimeout(() => {
+    if (notification.parentNode) notification.remove();
+  }, 20000);
+}
+
+function showTestNotification() {
+  const notification = document.createElement('div');
+  notification.className = 'test-notification';
+  notification.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 320px;
+    max-width: 400px;
+    z-index: 10002;
+    box-shadow: 0 6px 30px var(--shadow);
+    animation: slideInRight 0.4s ease;
+  `;
+  
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+      <i data-lucide="bell" style="width: 24px; height: 24px; color: var(--accent);"></i>
+      <h3 style="margin: 0; font-size: 16px; color: var(--text-primary);">🔔 Test Notification</h3>
+    </div>
+    <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">
+      Notifications are working! You'll see in-app reminders for deadlines and overdue items.
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button onclick="this.closest('.test-notification').remove()" style="flex: 1; padding: 8px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Dismiss</button>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  lucide.createIcons();
+  
+  showToast('Test notification displayed');
+  
+  // Auto-dismiss after 10 seconds
+  setTimeout(() => {
+    if (notification.parentNode) notification.remove();
+  }, 10000);
+}
+
+
+
+// Data management settings and buttons
 document.getElementById('exportDataBtn').addEventListener('click', () => {
   const dataStr = JSON.stringify(dashboardData, null, 2);
   const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -1471,6 +2433,7 @@ document.getElementById('exportDataBtn').addEventListener('click', () => {
   link.download = `dashboard-backup-${new Date().toISOString().split('T')[0]}.json`;
   link.click();
   URL.revokeObjectURL(url);
+  updateLastExportDate();
 });
 
 document.getElementById('importDataBtn').addEventListener('click', () => {
@@ -1584,25 +2547,56 @@ function initializeRSSFeedTabs() {
 
 function extractFeedName(feed) {
   try {
-      const url = typeof feed === 'string' ? feed : feed.url || '';
+    const url = typeof feed === 'string' ? feed : feed.url || '';
     if (!url) return 'Feed';
     
     const urlObj = new URL(url);
-    let name = urlObj.hostname.replace('www.', '');
-    name = name.split('.')[0];
-    return name.charAt(0).toUpperCase() + name.slice(1);
+    let hostname = urlObj.hostname.replace('www.', '');
+    
+    // Manual mappings for known feeds with proper names
+    const feedNameMap = {
+      'bleepingcomputer.com': 'Bleeping Computer',
+      'krebsonsecurity.com': 'Krebs on Security',
+      'darkreading.com': 'Dark Reading',
+      'threatpost.com': 'Threatpost',
+      'infosecurity-magazine.com': 'Infosecurity Magazine',
+      'cisoseries.libsyn.com': 'CISOseries',
+      'news.ycombinator.com': 'Hacker News',
+      'feeds.feedburner.com': 'Feedburner'
+    };
+    
+    // Check if there's a custom mapping
+    if (feedNameMap[hostname]) {
+      return feedNameMap[hostname];
+    }
+    
+    // Fallback: Extract from hostname
+    let name = hostname.split('.')[0];
+    
+    // Handle multi-word domains (like dark-reading)
+    if (name.includes('-')) {
+      name = name.split('-').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+    } else {
+      name = name.charAt(0).toUpperCase() + name.slice(1);
+    }
+    
+    return name;
   } catch {
     return 'Feed';
   }
 }
 
+
 async function loadSingleRSSFeed(feedUrl) {
   const content = document.getElementById('rssContent');
-  content.innerHTML = '<div class="loading">Loading feed...</div>';
+  content.innerHTML = '<div class="news-loading">Loading feed...</div>';
 
   const url = typeof feedUrl === 'string' ? feedUrl : feedUrl.url || '';
   if (!url) {
-    content.innerHTML = '<div class="error">Invalid feed URL</div>';
+    content.innerHTML = '<div class="news-error"><i data-lucide="alert-circle"></i><span>Invalid feed URL</span></div>';
+    lucide.createIcons();
     return;
   }
 
@@ -1611,24 +2605,62 @@ async function loadSingleRSSFeed(feedUrl) {
     const data = await response.json();
     
     if (data.status === 'error') {
-      content.innerHTML = `<div class="error">Feed error: ${data.message || 'Unable to load feed'}</div>`;
+      content.innerHTML = `<div class="news-error"><i data-lucide="alert-circle"></i><span>Feed error: ${data.message || 'Unable to load feed'}</span></div>`;
+      lucide.createIcons();
       return;
     }
     
     if (data.items && data.items.length > 0) {
       const articles = data.items.slice(0, UI_CONSTANTS.RSS_FEED_LIMIT);
-      content.innerHTML = articles.map(article => `
-        <div class="news-item">
-          <h3><a href="${article.link}" target="_blank">${article.title}</a></h3>
-          <small>${new Date(article.pubDate).toLocaleDateString()}</small>
-          <p>${(article.description || '').replace(/<[^>]*>/g, '').substring(0, 150)}...</p>
-        </div>
-      `).join('');
+      const feedName = data.feed?.title || extractFeedName(url);
+      
+      content.innerHTML = articles.map(article => {
+        const description = (article.description || article.content || '').replace(/<[^>]*>/g, '').substring(0, 200);
+        const pubDate = new Date(article.pubDate);
+        const timeAgo = getTimeAgo(pubDate);
+        
+        return `
+          <div class="news-item" onclick="window.open('${article.link}', '_blank')">
+            <div class="news-item-header">
+              <a href="${article.link}" target="_blank" class="news-item-title" onclick="event.stopPropagation()">${article.title}</a>
+            </div>
+            <div class="news-item-meta">
+              <span class="news-item-source">
+                <i data-lucide="rss"></i>
+                ${feedName}
+              </span>
+              <span class="news-item-date">
+                <i data-lucide="clock"></i>
+                ${timeAgo}
+              </span>
+            </div>
+            <div class="news-item-description">${description}${description.length >= 200 ? '...' : ''}</div>
+            <div class="news-item-footer">
+              <a href="${article.link}" target="_blank" class="news-item-link" onclick="event.stopPropagation()">
+                Read more
+                <i data-lucide="arrow-right"></i>
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      lucide.createIcons();
     } else {
-      content.innerHTML = '<div class="error">No articles found</div>';
+      content.innerHTML = '<div class="news-error"><i data-lucide="inbox"></i><span>No articles found</span></div>';
+      lucide.createIcons();
     }
   } catch (error) {
-    content.innerHTML = `<div class="error">Failed to load feed. <button class="btn btn-secondary" onclick="loadSingleRSSFeed('${url.replace(/'/g, "\\'")}')">Retry</button></div>`;
+    content.innerHTML = `
+      <div class="news-error">
+        <i data-lucide="wifi-off"></i>
+        <div>
+          <div>Failed to load feed</div>
+          <button class="btn btn-secondary" style="margin-top: 10px;" onclick="loadSingleRSSFeed('${url.replace(/'/g, "\\'")}')">Retry</button>
+        </div>
+      </div>
+    `;
+    lucide.createIcons();
     console.error('Error loading feed:', error);
   }
 }
@@ -1659,19 +2691,25 @@ function initializeNewsTabs() {
 
 async function loadRSSFeeds(limit) {
   const content = document.getElementById('rssContent');
-  content.innerHTML = '<div class="loading">Loading RSS feeds...</div>';
+  content.innerHTML = '<div class="news-loading">Loading RSS feeds...</div>';
 
   try {
     let allArticles = [];
     
-    for (const feedUrl of dashboardData.newsFeeds) {
-          const url = typeof feedUrl === 'string' ? feedUrl : feedUrl.url || '';
+    for (const feedData of dashboardData.newsFeeds) {
+      const url = typeof feedData === 'string' ? feedData : feedData.url || '';
       if (!url) continue;
       
       try {
         const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
         const data = await response.json();
         if (data.status === 'ok' && data.items) {
+          // Add source name to each article
+          const feedName = typeof feedData === 'string' ? extractFeedName(feedData) : (feedData.name || extractFeedName(url));
+          data.items.forEach(item => {
+            item.sourceName = feedName;
+            item.sourceUrl = url;
+          });
           allArticles = allArticles.concat(data.items);
         } else {
           console.warn(`Feed returned non-ok status: ${url}`, data);
@@ -1681,23 +2719,58 @@ async function loadRSSFeeds(limit) {
       }
     }
 
-      allArticles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    allArticles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
     allArticles = allArticles.slice(0, limit);
 
     if (allArticles.length === 0) {
-      content.innerHTML = '<div class="error">No articles available. Check your feed URLs in settings.</div>';
+      content.innerHTML = '<div class="news-error"><i data-lucide="inbox"></i><span>No articles available. Check your feed URLs in settings.</span></div>';
+      lucide.createIcons();
       return;
     }
 
-    content.innerHTML = allArticles.map(article => `
-      <div class="news-item">
-        <h3><a href="${article.link}" target="_blank">${article.title}</a></h3>
-        <small>${new Date(article.pubDate).toLocaleDateString()}</small>
-        <p>${article.description?.replace(/<[^>]*>/g, '').substring(0, 150)}...</p>
-      </div>
-    `).join('');
+    content.innerHTML = allArticles.map(article => {
+      const description = (article.description || article.content || '').replace(/<[^>]*>/g, '').substring(0, 200);
+      const pubDate = new Date(article.pubDate);
+      const timeAgo = getTimeAgo(pubDate);
+      
+      return `
+        <div class="news-item" onclick="window.open('${article.link}', '_blank')">
+          <div class="news-item-header">
+            <a href="${article.link}" target="_blank" class="news-item-title" onclick="event.stopPropagation()">${article.title}</a>
+          </div>
+          <div class="news-item-meta">
+            <span class="news-item-source">
+              <i data-lucide="rss"></i>
+              ${article.sourceName}
+            </span>
+            <span class="news-item-date">
+              <i data-lucide="clock"></i>
+              ${timeAgo}
+            </span>
+          </div>
+          <div class="news-item-description">${description}${description.length >= 200 ? '...' : ''}</div>
+          <div class="news-item-footer">
+            <a href="${article.link}" target="_blank" class="news-item-link" onclick="event.stopPropagation()">
+              Read more
+              <i data-lucide="arrow-right"></i>
+            </a>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    lucide.createIcons();
   } catch (error) {
-    content.innerHTML = `<div class="error">Failed to load RSS feeds. <button class="btn btn-secondary" onclick="loadRSSFeeds(3)">Retry</button></div>`;
+    content.innerHTML = `
+      <div class="news-error">
+        <i data-lucide="wifi-off"></i>
+        <div>
+          <div>Failed to load RSS feeds</div>
+          <button class="btn btn-secondary" style="margin-top: 10px;" onclick="loadRSSFeeds(3)">Retry</button>
+        </div>
+      </div>
+    `;
+    lucide.createIcons();
     console.error('Error loading RSS:', error);
   }
 }
@@ -1745,10 +2818,10 @@ async function fetchRSS(url, limit) {
 
 async function loadReddit(subreddit) {
   const content = document.getElementById('redditContent');
-  content.innerHTML = '<div class="loading">Loading r/' + subreddit + '...</div>';
+  content.innerHTML = '<div class="news-loading">Loading r/' + subreddit + '...</div>';
 
   try {
-      const response = await fetch(`https://corsproxy.io/?https://www.reddit.com/r/${subreddit}/top.json?t=week&limit=${UI_CONSTANTS.REDDIT_POST_LIMIT}`);
+    const response = await fetch(`https://corsproxy.io/?https://www.reddit.com/r/${subreddit}/top.json?t=week&limit=${UI_CONSTANTS.REDDIT_POST_LIMIT}`);
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -1757,26 +2830,68 @@ async function loadReddit(subreddit) {
     const data = await response.json();
     
     if (!data.data || !data.data.children) {
-      content.innerHTML = '<div class="error">Subreddit not found or is private</div>';
+      content.innerHTML = '<div class="news-error"><i data-lucide="alert-circle"></i><span>Subreddit not found or is private</span></div>';
+      lucide.createIcons();
       return;
     }
 
     const posts = data.data.children.map(post => post.data);
     
     if (posts.length === 0) {
-      content.innerHTML = '<div class="error">No posts found this week</div>';
+      content.innerHTML = '<div class="news-error"><i data-lucide="inbox"></i><span>No posts found this week</span></div>';
+      lucide.createIcons();
       return;
     }
     
-    content.innerHTML = posts.map(post => `
-      <div class="news-item">
-        <h3><a href="https://reddit.com${post.permalink}" target="_blank">${post.title}</a></h3>
-        <small>r/${subreddit} &bull; ${post.score} upvotes</small>
-        <p>${post.selftext?.substring(0, 150) || 'No text'}...</p>
-      </div>
-    `).join('');
+    content.innerHTML = posts.map(post => {
+      const text = post.selftext?.substring(0, 250) || '';
+      const timeAgo = getTimeAgo(new Date(post.created_utc * 1000));
+      
+      return `
+        <div class="reddit-item" onclick="window.open('https://reddit.com${post.permalink}', '_blank')">
+          <div class="reddit-item-header">
+            <div class="reddit-item-title">${post.title}</div>
+          </div>
+          <div class="reddit-item-meta">
+            <span class="reddit-subreddit">r/${subreddit}</span>
+            <div class="reddit-stats">
+              <span class="reddit-stat">
+                <i data-lucide="arrow-up"></i>
+                ${post.score}
+              </span>
+              <span class="reddit-stat">
+                <i data-lucide="message-circle"></i>
+                ${post.num_comments}
+              </span>
+              <span class="reddit-stat">
+                <i data-lucide="clock"></i>
+                ${timeAgo}
+              </span>
+            </div>
+          </div>
+          ${text ? `<div class="reddit-item-text">${text}${text.length >= 250 ? '...' : ''}</div>` : ''}
+          <div class="reddit-item-footer">
+            <a href="https://reddit.com${post.permalink}" target="_blank" class="reddit-item-link" onclick="event.stopPropagation()">
+              View discussion
+              <i data-lucide="arrow-right"></i>
+            </a>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    lucide.createIcons();
   } catch (error) {
-    content.innerHTML = `<div class="error">Failed to load r/${subreddit}. <button class="btn btn-secondary" onclick="loadReddit('${subreddit}')">Retry</button></div>`;
+    content.innerHTML = `
+      <div class="news-error">
+        <i data-lucide="wifi-off"></i>
+        <div>
+          <div>Failed to load r/${subreddit}</div>
+          <button class="btn btn-secondary" style="margin-top: 10px;" onclick="loadReddit('${subreddit}')">Retry</button>
+        </div>
+      </div>
+    `;
+    lucide.createIcons();
     console.error('Error loading Reddit:', error);
   }
 }
@@ -1907,14 +3022,6 @@ function addRedditSub() {
   } else {
     alert('This subreddit is already added');
   }
-}
-
-function openModal(modalId) {
-  document.getElementById(modalId).classList.add('active');
-}
-
-function closeModal(modalId) {
-  document.getElementById(modalId).classList.remove('active');
 }
 
 // Convert any path format to a file:// URL the browser/extension can open
@@ -2791,14 +3898,14 @@ function renderProjectsTable() {
   
   lucide.createIcons();
 }
-function openEditProjectModal(projectId) {
+function openEditProjectModal(projectId, prefilledDate) {
   editingProjectId = projectId;
   const proj = projectId ? dashboardData.projects.find(p => p.id === projectId) : null;
   document.getElementById('editProjectModalTitle').textContent = proj ? 'Edit Project' : 'New Project';
   document.getElementById('editProjectName').value = proj ? proj.name : '';
   document.getElementById('editProjectDescription').value = proj ? (proj.description || '') : '';
   document.getElementById('editProjectNotes').value = proj ? (proj.notes || '') : '';
-  document.getElementById('editProjectDueDate').value = proj ? (proj.dueDate || '') : '';
+  document.getElementById('editProjectDueDate').value = proj ? (proj.dueDate || '') : (prefilledDate || ''); // Already fixed
   document.getElementById('editProjectStatus').value = proj ? (proj.status || 'Planning') : 'Planning';
   document.getElementById('editProjectTags').value = proj ? (proj.tags || []).join(', ') : '';
 
@@ -2810,12 +3917,23 @@ function openEditProjectModal(projectId) {
   openBtn.style.display = has ? 'inline-flex' : 'none';
   clearBtn.style.display = has ? 'inline-flex' : 'none';
 
-  // Wire up close buttons for this modal specifically
   const editProjectModal = document.getElementById('editProjectModal');
   if (editProjectModal) {
     editProjectModal.querySelectorAll('.modal-close').forEach(btn => {
       btn.onclick = () => closeModal('editProjectModal');
     });
+  }
+
+  //  Wire up Save and Cancel buttons every time modal opens
+  const saveBtn = document.getElementById('saveEditProjectBtn');
+  const cancelBtn = document.getElementById('cancelEditProjectBtn');
+  
+  if (saveBtn) {
+    saveBtn.onclick = saveEditProject;
+  }
+  
+  if (cancelBtn) {
+    cancelBtn.onclick = () => closeModal('editProjectModal');
   }
 
   openModal('editProjectModal');
@@ -2824,7 +3942,7 @@ function openEditProjectModal(projectId) {
 
 function saveEditProject() {
   const name = document.getElementById('editProjectName').value.trim();
-  if (!name) { showToast('Project name is required'); return; }
+  if (!name) { alert('Project name is required'); return; }
   const description = document.getElementById('editProjectDescription').value.trim();
   const notes = document.getElementById('editProjectNotes').value.trim();
   const dueDate = document.getElementById('editProjectDueDate').value;
@@ -2848,6 +3966,7 @@ function saveEditProject() {
   saveData();
   closeModal('editProjectModal');
   renderProjectsPageView();
+  renderCalendar();
 }
 
 function deleteProjectCard(projectId) {
@@ -3443,11 +4562,17 @@ function closeModal(modalId) {
   }
 }
 
-function openTaskModal(taskId) {
+function openTaskModal(taskId, prefilledDate) {
   const project = getActiveProject();
+  
+  // Safety check
+  if (!project) {
+    alert('Please create a project first before adding tasks.');
+    return;
+  }
+  
   currentEditingTaskId = taskId;
 
-  // Populate status dropdown from project columns
   const statusSel = document.getElementById('taskStatus');
   statusSel.innerHTML = project.columns.map(c => `<option value="${c}">${c}</option>`).join('');
 
@@ -3468,24 +4593,34 @@ function openTaskModal(taskId) {
     document.getElementById('taskNotes').value = '';
     document.getElementById('taskStatus').value = project.columns[1] || project.columns[0];
     document.getElementById('taskPriority').value = 'medium';
-    document.getElementById('taskDueDate').value = '';
+    document.getElementById('taskDueDate').value = prefilledDate || '';
     document.getElementById('taskTags').value = '';
     tempTodos = [];
     setTaskFolderPath('');
   }
 
-  renderTodoList();
+  // Wire up Save and Cancel buttons every time modal opens
+  const saveBtn = document.getElementById('saveTaskBtn');
+  const cancelBtn = document.getElementById('cancelTaskBtn');
   
-  // Wire up close buttons for this modal specifically
+  if (saveBtn) {
+    saveBtn.onclick = saveTask;
+  }
+  
+  if (cancelBtn) {
+    cancelBtn.onclick = () => closeModal('taskModal');
+  }
+  // Wire up the X close button
   const taskModal = document.getElementById('taskModal');
   if (taskModal) {
     taskModal.querySelectorAll('.modal-close').forEach(btn => {
       btn.onclick = () => closeModal('taskModal');
     });
   }
-  
+
+  renderTodoList();
   openModal('taskModal');
-  document.getElementById('taskTitle').focus();
+  setTimeout(() => document.getElementById('taskTitle').focus(), 100);
 }
 
 function setTaskFolderPath(path) {
@@ -3560,7 +4695,13 @@ function saveTask() {
   saveData();
   closeModal('taskModal');
   renderTasksView();
+  
+  // Re-render calendar to show new/updated task immediately
+  if (typeof renderCalendar === 'function') {
+    renderCalendar();
+  }
 }
+
 
 function deleteTask(taskId) {
   if (!confirm('Delete this task?')) return;
@@ -3813,7 +4954,6 @@ function getHolidayForDate(date) {
   
   // Fixed date holidays
   const fixedHolidays = {
-    '0-1': "New Year's Day",
     '0-6': 'Epiphany',
     '1-2': 'Groundhog Day',
     '1-14': "Valentine's Day",
@@ -3822,12 +4962,9 @@ function getHolidayForDate(date) {
     '3-22': 'Earth Day',
     '4-5': 'Cinco de Mayo',
     '5-14': 'Flag Day',
-    '5-19': 'Juneteenth',
-    '6-4': 'Independence Day',
     '9-31': 'Halloween',
-    '10-11': "Veterans Day",
-    '11-24': 'Christmas Eve',
-    '11-25': 'Christmas',
+    '9-25': "Raf's B-day (Should be CS Observed)",
+    '11-24': 'Christmas Eve (CS Observed)',
     '11-31': "New Year's Eve"
   };
   
@@ -3835,36 +4972,141 @@ function getHolidayForDate(date) {
   if (fixedHolidays[key]) return fixedHolidays[key];
   
   // Floating holidays (nth weekday of month)
+  
+  // Fixed date holidays with federal observance rules
+
+  // New Year's Day - January 1
+  if (month === 0 && day === 1) {
+    return "New Year's Day (CS Observed)";
+  }
+  // New Year's observed on Friday, December 31 when January 1 is Saturday
+  if (month === 11 && day === 31 && dayOfWeek === 5) {
+    const tomorrow = new Date(year + 1, 0, 1);
+    if (tomorrow.getDay() === 6) {
+      return "New Year's Day (Observed)";
+    }
+  }
+  // New Year's observed on Monday when January 1 is Sunday
+  if (month === 0 && day === 2 && dayOfWeek === 1) {
+    const yesterday = new Date(year, month, day - 1);
+    if (yesterday.getDay() === 0) {
+      return "New Year's Day (Observed)";
+    }
+  }
+
+  // Floating holidays (nth weekday of month)
+
   // MLK Day - 3rd Monday of January
   if (month === 0 && dayOfWeek === 1 && day >= 15 && day <= 21) {
-    return 'MLK Day';
+    return 'MLK Day (CS Observed)';
   }
-  
+
   // Presidents Day - 3rd Monday of February
   if (month === 1 && dayOfWeek === 1 && day >= 15 && day <= 21) {
     return "Presidents' Day";
   }
-  
+
   // Memorial Day - Last Monday of May
   if (month === 4 && dayOfWeek === 1 && day >= 25) {
-    return 'Memorial Day';
+    return 'Memorial Day (CS Observed)';
   }
-  
+
+  // Juneteenth - June 19
+  if (month === 5 && day === 19) {
+    return 'Juneteenth (CS Observed)';
+  }
+  // Juneteenth observed on Friday when June 19 is Saturday
+  if (month === 5 && day === 18 && dayOfWeek === 5) {
+    const tomorrow = new Date(year, month, day + 1);
+    if (tomorrow.getDay() === 6) {
+      return 'Juneteenth (CS Observed)';
+    }
+  }
+  // Juneteenth observed on Monday when June 19 is Sunday
+  if (month === 5 && day === 20 && dayOfWeek === 1) {
+    const yesterday = new Date(year, month, day - 1);
+    if (yesterday.getDay() === 0) {
+      return 'Juneteenth (CS Observed)';
+    }
+  }
+
+  // Independence Day - July 4
+  if (month === 6 && day === 4) {
+    return 'Independence Day (CS Observed)';
+  }
+  // Independence Day observed on Friday when July 4 is Saturday
+  if (month === 6 && day === 3 && dayOfWeek === 5) {
+    const tomorrow = new Date(year, month, day + 1);
+    if (tomorrow.getDay() === 6) {
+      return 'Independence Day (CS Observed)';
+    }
+  }
+  // Independence Day observed on Monday when July 4 is Sunday
+  if (month === 6 && day === 5 && dayOfWeek === 1) {
+    const yesterday = new Date(year, month, day - 1);
+    if (yesterday.getDay() === 0) {
+      return 'Independence Day (CS Observed)';
+    }
+  }
+
   // Labor Day - 1st Monday of September
   if (month === 8 && dayOfWeek === 1 && day <= 7) {
-    return 'Labor Day';
+    return 'Labor Day (CS Observed)';
   }
-  
+
   // Columbus Day - 2nd Monday of October
   if (month === 9 && dayOfWeek === 1 && day >= 8 && day <= 14) {
     return 'Columbus Day';
   }
-  
+
+  // Veterans Day - November 11
+  if (month === 10 && day === 11) {
+    return 'Veterans Day (CS Observed)';
+  }
+  // Veterans Day observed on Friday when November 11 is Saturday
+  if (month === 10 && day === 10 && dayOfWeek === 5) {
+    const tomorrow = new Date(year, month, day + 1);
+    if (tomorrow.getDay() === 6) {
+      return 'Veterans Day (CS Observed)';
+    }
+  }
+  // Veterans Day observed on Monday when November 11 is Sunday
+  if (month === 10 && day === 12 && dayOfWeek === 1) {
+    const yesterday = new Date(year, month, day - 1);
+    if (yesterday.getDay() === 0) {
+      return 'Veterans Day (CS Observed)';
+    }
+  }
+
   // Thanksgiving - 4th Thursday of November
   if (month === 10 && dayOfWeek === 4 && day >= 22 && day <= 28) {
-    return 'Thanksgiving';
+    return 'Thanksgiving (CS Observed)';
   }
-  
+
+  // Black Friday - 4th Friday of November
+  if (month === 10 && dayOfWeek === 5 && day >= 23 && day <= 29) {
+    return 'Black Friday (CS Observed)';
+  }
+
+  // Christmas - December 25
+  if (month === 11 && day === 25) {
+    return 'Christmas (CS Observed)';
+  }
+  // Christmas observed on Friday when December 25 is Saturday
+  if (month === 11 && day === 24 && dayOfWeek === 5) {
+    const tomorrow = new Date(year, month, day + 1);
+    if (tomorrow.getDay() === 6) {
+      return 'Christmas (CS Observed)';
+    }
+  }
+  // Christmas observed on Monday when December 25 is Sunday
+  if (month === 11 && day === 26 && dayOfWeek === 1) {
+    const yesterday = new Date(year, month, day - 1);
+    if (yesterday.getDay() === 0) {
+      return 'Christmas (CS Observed)';
+    }
+  }
+
   // Easter (simplified calculation - works for 2020-2030)
   const easterDates = {
     2024: new Date(2024, 2, 31), // March 31
@@ -3892,7 +5134,26 @@ function getHolidayForDate(date) {
   if (month === 5 && dayOfWeek === 0 && day >= 15 && day <= 21) {
     return "Father's Day";
   }
-  
+
+  // Juneteenth - June 19 (with federal observance rules)
+if (month === 5 && day === 19) {
+  return 'Juneteenth (CS Observed)';
+}
+// Juneteenth observed on Friday when June 19 is Saturday
+if (month === 5 && day === 18 && dayOfWeek === 5) {
+  const tomorrow = new Date(year, month, day + 1);
+  if (tomorrow.getDay() === 6) {
+    return 'Juneteenth (CS Observed)';
+  }
+}
+// Juneteenth observed on Monday when June 19 is Sunday
+if (month === 5 && day === 20 && dayOfWeek === 1) {
+  const yesterday = new Date(year, month, day - 1);
+  if (yesterday.getDay() === 0) {
+    return 'Juneteenth (CS Observed)';
+  }
+}
+
   return null;
 }
 
@@ -3937,7 +5198,10 @@ function createDayCell(date, isOtherMonth, events, isToday) {
   eventsContainer.className = 'calendar-events';
   
   const dayEvents = events.filter(event => {
-    const eventDate = new Date(event.dueDate);
+    // FIXED: Parse date as local instead of UTC
+    const [year, month, day] = event.dueDate.split('-').map(Number);
+    const eventDate = new Date(year, month - 1, day);
+    
     return eventDate.getDate() === date.getDate() &&
            eventDate.getMonth() === date.getMonth() &&
            eventDate.getFullYear() === date.getFullYear();
@@ -3968,6 +5232,13 @@ function createDayCell(date, isOtherMonth, events, isToday) {
     selectedCalendarDate = new Date(date);
     showEventsSidebar(date, dayEvents);
     renderCalendar(); // Re-render to update selection
+  };
+  
+  // Right-click handler for creating projects/tasks
+  cell.oncontextmenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showCalendarDayContextMenu(e, date);
   };
   
   return cell;
@@ -4081,12 +5352,10 @@ function showEventsSidebar(date, events) {
       const eventData = JSON.parse(item.dataset.eventData);
       
       if (eventType === 'project') {
-        // Navigate to project's tasks
         dashboardData.activeProjectId = eventData.id;
         saveData();
         switchPage('tasks');
       } else {
-        // Navigate to task's project, then open task modal
         const project = dashboardData.projects.find(p => 
           p.tasks && p.tasks.some(t => t.id === eventData.id)
         );
@@ -4100,7 +5369,90 @@ function showEventsSidebar(date, events) {
         }
       }
     };
+    
+    // RIGHT-CLICK CONTEXT MENU
+    item.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const eventType = item.dataset.eventType;
+      const eventData = JSON.parse(item.dataset.eventData);
+      
+      if (eventType === 'project') {
+        const proj = dashboardData.projects.find(p => p.id === eventData.id);
+        if (proj) {
+          showProjectInfoPanel(e, proj);
+        }
+      } else {
+        let task = null;
+        for (const proj of dashboardData.projects) {
+          task = proj.tasks.find(t => t.id === eventData.id);
+          if (task) break;
+        }
+        if (task) {
+          showTaskInfoPanel(e, task);
+        }
+      }
+    };
   });
   
   setTimeout(() => lucide.createIcons(), 0);
+}
+
+
+function showCalendarDayContextMenu(e, date) {
+  // Remove any existing context menu
+  const existing = document.getElementById('calendarDayContextMenu');
+  if (existing) existing.remove();
+  
+  const menu = document.createElement('div');
+  menu.id = 'calendarDayContextMenu';
+  menu.className = 'context-menu';
+  menu.style.position = 'fixed';
+  menu.style.left = `${e.clientX}px`;
+  menu.style.top = `${e.clientY}px`;
+  menu.style.zIndex = '10000';
+  
+  // Format date as YYYY-MM-DD for input
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
+  
+  menu.innerHTML = `
+    <div class="context-menu-item" data-action="createProject">
+      <i data-lucide="folder-plus"></i>
+      <span>Create Project Due This Day</span>
+    </div>
+    <div class="context-menu-item" data-action="createTask">
+      <i data-lucide="plus-square"></i>
+      <span>Create Task Due This Day</span>
+    </div>
+  `;
+  
+  document.body.appendChild(menu);
+  lucide.createIcons();
+  
+  // Handle menu actions
+  menu.querySelectorAll('.context-menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      menu.remove();
+      
+      if (action === 'createProject') {
+        openEditProjectModal(null, dateStr);
+      } else if (action === 'createTask') {
+        openTaskModal(null, dateStr);
+      }
+    });
+  });
+  
+  // Close menu on click outside
+  const closeMenu = (e) => {
+    if (!menu.contains(e.target)) {
+      menu.remove();
+      document.removeEventListener('click', closeMenu);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeMenu), 0);
 }
