@@ -77,7 +77,7 @@
       </a>
     </nav>
     <div class="sidebar-footer">
-      <span class="sidebar-version" id="sidebarVersion">v2.2.0</span>
+      <span class="sidebar-version" id="sidebarVersion">v2.3.0</span>
       <button class="sidebar-help-btn" id="sidebarHelpBtn" title="Keyboard shortcuts">
         <i data-lucide="help-circle"></i>
       </button>
@@ -500,7 +500,7 @@
             </button>
           </div>
         </div>
-
+        <!--Data Management-->
         <div class="setting-group">
           <h3>Data Management</h3>
           <button id="exportDataBtn" class="btn btn-primary">Export Data</button>
@@ -510,12 +510,19 @@
           <button id="clearAllDataBtn" class="btn btn-danger" style="background: #ef4444; color: white;">Clear All Data</button>
           <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px;">⚠️ This will permanently delete all bookmarks, projects, and tasks. Export your data first!</p>
         </div>
+<!--Templates management-->
+         <div class="setting-group">
+          <h3>Templates</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 12px;">Create and manage project and task templates for quick creation</p>
+          <button id="manageTemplatesBtn" class="btn btn-primary">Manage Templates</button>
+        </div>
 
         <div class="setting-group">
           <h3>Updates</h3>
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-            <span style="color: var(--text-secondary);">Current Version: <strong id="currentVersion">2.0.0</strong></span>
+            <span style="color: var(--text-secondary);">Current Version: <strong id="currentVersion">2.3.0</strong></span>
           </div>
+<!--Update checker-->
           <button id="checkUpdatesBtn" class="btn btn-primary">Check for Updates</button>
           <div id="updateNotification" style="display: none; margin-top: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border-left: 3px solid var(--accent);">
             <p style="font-weight: 600; margin-bottom: 8px;"><span id="updateStatus"></span></p>
@@ -664,6 +671,13 @@
         <button class="modal-close"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body task-modal-body">
+        <div class="form-group template-select-group" style="margin-bottom: 1.5rem;">
+        <label for="taskTemplateSelect">Create from template</label>
+        </label>
+        <select id="taskTemplateSelect" onchange="applyTaskTemplate()">
+          <option value="">None</option>
+        </select>
+      </div>
         <div class="task-form-grid">
           <div class="task-form-main">
             <div class="form-group">
@@ -759,7 +773,7 @@
     </div>
   </div>
 
-  <!-- Edit / New Project Modal -->
+<!-- Edit / New Project Modal -->
   <div class="modal" id="editProjectModal">
     <div class="modal-content">
       <div class="modal-header">
@@ -767,6 +781,13 @@
         <button class="modal-close"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body">
+        <div class="form-group template-select-group">
+        <label for="projectTemplateSelect">Create from template</label>
+        </label>
+        <select id="projectTemplateSelect" onchange="applyProjectTemplate()">
+          <option value="">None</option>
+        </select>
+      </div>
         <div class="form-group">
           <label for="editProjectName">Project Name *</label>
           <input type="text" id="editProjectName" class="form-control" placeholder="e.g. Website Redesign">
@@ -879,7 +900,116 @@
 
   </div>
 
+  <!-- ===== TEMPLATES SYSTEM MODALS ===== -->
 
+  <!-- Main Templates Library Modal -->
+  <div class="modal" id="templatesModal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h2>Templates</h2>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body templates-modal-body">
+        <div class="templates-section">
+          <div class="templates-section-header">
+            <h3>Project Templates</h3>
+            <button id="addProjectTemplateBtn" class="btn btn-primary">
+              <i data-lucide="plus"></i> New Project Template
+            </button>
+          </div>
+          <div id="projectTemplatesList" class="templates-list"></div>
+        </div>
+        
+        <div class="templates-section">
+          <div class="templates-section-header">
+            <h3>Task Templates</h3>
+            <button id="addTaskTemplateBtn" class="btn btn-primary">
+              <i data-lucide="plus"></i> New Task Template
+            </button>
+          </div>
+          <div id="taskTemplatesList" class="templates-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="closeTemplatesBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== PROJECT TEMPLATE EDIT MODAL ========== -->
+  <div class="modal" id="projectTemplateModal">
+    <div class="modal-content modal-md">
+      <div class="modal-header">
+        <h2 id="projectTemplateModalTitle">Project Template</h2>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="projectTemplateName">Template Name *</label>
+          <input type="text" id="projectTemplateName" class="form-control" placeholder="e.g., Web Development Project">
+        </div>
+        
+        <div class="form-group">
+          <label for="projectTemplateDescription">Description (optional)</label>
+          <textarea id="projectTemplateDescription" class="form-control" rows="3" placeholder="Describe this template..."></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="projectTemplateTags">Tags (optional)</label>
+          <input type="text" id="projectTemplateTags" class="form-control" placeholder="Separate tags with commas">
+        </div>
+        
+        <div class="form-hint">
+          <i data-lucide="info"></i>
+          <span>Templates include default columns (To Do, In Progress, Done). You can customize them after creating a project from this template.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="cancelProjectTemplateBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveProjectTemplateBtn">Save Template</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TASK TEMPLATE EDIT MODAL ========== -->
+  <div class="modal" id="taskTemplateModal">
+    <div class="modal-content modal-md">
+      <div class="modal-header">
+        <h2 id="taskTemplateModalTitle">Task Template</h2>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="taskTemplateName">Template Name *</label>
+          <input type="text" id="taskTemplateName" class="form-control" placeholder="e.g., Bug Fix Template">
+        </div>
+        
+        <div class="form-group">
+          <label for="taskTemplateDescription">Description (optional)</label>
+          <textarea id="taskTemplateDescription" class="form-control" rows="2" placeholder="Describe this template..."></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="taskTemplateTitle">Default Task Title</label>
+          <input type="text" id="taskTemplateTitle" class="form-control" placeholder="e.g., Fix: [Issue Description]">
+        </div>
+        
+        <div class="form-group">
+          <label for="taskTemplateNotes">Default Notes</label>
+          <textarea id="taskTemplateNotes" class="form-control" rows="4" placeholder="Steps to reproduce:&#10;1. ...&#10;2. ..."></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="taskTemplateTags">Tags (optional)</label>
+          <input type="text" id="taskTemplateTags" class="form-control" placeholder="Separate tags with commas">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="cancelTaskTemplateBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveTaskTemplateBtn">Save Template</button>
+      </div>
+    </div>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>

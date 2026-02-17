@@ -1,4 +1,4 @@
-/* CSS Variables & Themes */
+/* ===== CSS VARIABLES / THEMES ===== */
 
 :root {
   --sidebar-width: 250px;
@@ -111,7 +111,7 @@ body[data-theme="peanutbutter"] {
 }
 
 
-/* Reset & Base Styles */
+/* ===== RESET & BASE ===== */
 
 * {
   margin: 0;
@@ -129,7 +129,7 @@ body {
   transition: var(--transition);
 }
 
-/* Sidebar */
+/* ===== LAYOUT: SIDEBAR ===== */
 
 .sidebar {
   width: var(--sidebar-width);
@@ -333,7 +333,7 @@ body {
   margin: 0 auto;
 }
 
-/* Main Content */
+/* ===== LAYOUT: MAIN CONTENT ===== */
 
 .main-content {
   flex: 1;
@@ -371,7 +371,7 @@ body {
   color: var(--text-primary);
 }
 
-/* Sections Container */
+/* ===== BOOKMARKS PAGE ===== */
 
 .sections-container {
   display: grid;
@@ -630,7 +630,7 @@ body {
   align-self: center;
 }
 
-/* Buttons */
+/* ===== BUTTONS & CONTROLS ===== */
 
 .btn {
   padding: 12px 24px;
@@ -706,7 +706,7 @@ body {
   height: 20px;
 }
 
-/* Modals */
+/* ===== MODALS ===== */
 
 .modal {
   display: none;
@@ -830,7 +830,7 @@ body {
   transform: scale(1.1);
 }
 
-/* Form Elements */
+/* ===== FORMS ===== */
 
 .form-control {
   width: 100%;
@@ -862,7 +862,7 @@ body {
   font-size: 0.95rem;
 }
 
-/* Settings Page */
+/* ===== SETTINGS PAGE ===== */
 
 .settings-content {
   max-width: 600px;
@@ -887,9 +887,7 @@ body {
   color: var(--text-secondary);
 }
 
-/* ========================================
-   News Page - Complete Polished Design
-   ======================================== */
+/* ===== NEWS PAGE ===== */
 
 .news-container {
   width: 100%;
@@ -1504,7 +1502,7 @@ body {
   pointer-events: none;
 }
 
-/* Context Menu */
+/* ===== CONTEXT MENUS ===== */
 
 .context-menu {
   position: fixed;
@@ -1564,7 +1562,7 @@ body {
   margin: 4px 0;
 }
 
-/* Toast Notifications */
+/* ===== TOAST NOTIFICATIONS ===== */
 
 .toast {
   position: fixed;
@@ -1827,7 +1825,7 @@ body {
   white-space: nowrap;
 }
 
-/* Responsive */
+/* ===== RESPONSIVE / MEDIA QUERIES ===== */
 
 @media (max-width: 768px) {
   .sidebar {
@@ -1889,9 +1887,7 @@ body {
   }
 }
 
-/* ============================================================
-   PROJECT TRACKING
-   ============================================================ */
+/* ===== PROJECTS PAGE ===== */
 
 /* Page header layout */
 .projects-header-left {
@@ -2675,9 +2671,7 @@ body {
   max-height: calc(90vh - 130px);
 }
 
-/* ============================================================
-   PROJECTS OVERVIEW PAGE
-   ============================================================ */
+/* ===== TASKS / KANBAN ===== */
 
 .projects-grid {
   display: grid;
@@ -2863,9 +2857,7 @@ body {
 }
 .kanban-column-header:active { cursor: grabbing; }
 
-/* ============================================================
-   PROJECTS PAGE — KANBAN BOARD
-   ============================================================ */
+/* ===== PROJECTS PAGE — KANBAN BOARD ===== */
 
 .projects-header-right {
   display: flex;
@@ -3105,6 +3097,7 @@ body {
 /* Bookmark card — consistent with task card sizing */
 .bookmark {
   padding: 12px;
+  overflow: visible;
 }
 
 /* Bookmark list — gap matches kanban cards */
@@ -3124,37 +3117,18 @@ body {
   height: 72px;
 }
 
-/* Bookmark card — tooltip appends inside card, must not be clipped */
-.bookmark {
-  overflow: visible;
-}
-
-/* Info panel links — URLs typed into notes fields */
-.info-panel-link {
-  color: var(--accent);
-  text-decoration: underline;
-  word-break: break-all;
-}
-.info-panel-link:hover {
-  color: var(--accent-hover);
-}
-
-/* Notes tooltip links */
-.notes-tooltip-content a {
-  color: var(--accent);
-  text-decoration: underline;
-  word-break: break-all;
-}
-.notes-tooltip-content a:hover {
-  color: var(--accent-hover);
-}
-
-/* Clickable links in notes */
+/* Clickable links in notes & info panels */
+.info-panel-link,
+.notes-tooltip-content a,
 .notes-link {
   color: var(--accent);
   text-decoration: underline;
   word-break: break-all;
+  cursor: pointer;
 }
+
+.info-panel-link:hover,
+.notes-tooltip-content a:hover,
 .notes-link:hover {
   color: var(--accent-hover);
 }
@@ -3178,6 +3152,8 @@ body {
 }
 
 .sort-header:hover .sort-hint {
+  opacity: 0.7;
+}
 
 /* Context menu */
 .context-menu {
@@ -3227,12 +3203,7 @@ body {
   margin: 6px 0;
 }
 
-  opacity: 0.6;
-}
-
-
-
-/* ==================== CALENDAR VIEW ==================== */
+/* ===== CALENDAR PAGE ===== */
 
 .calendar-controls {
   display: flex;
@@ -3316,7 +3287,7 @@ body {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
-  grid-auto-rows: minmax(120px, auto);
+  grid-auto-rows: minmax(160px, auto);
 }
 
 .calendar-day {
@@ -3366,7 +3337,7 @@ body {
 }
 
 .calendar-day-number {
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 4px;
@@ -3403,7 +3374,7 @@ body {
 .calendar-event {
   padding: 4px 6px;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 500;
   line-height: 1.3;
   overflow: hidden;
@@ -3434,7 +3405,7 @@ body {
 
 .calendar-event-more {
   padding: 2px 6px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   font-style: italic;
   cursor: pointer;
@@ -3608,7 +3579,7 @@ body {
   }
 }
 
-/* Keyboard Shortcuts Help Panel */
+/* ===== KEYBOARD SHORTCUTS PANEL ===== */
 .shortcuts-panel {
   position: fixed;
   top: 50%;
@@ -3733,9 +3704,7 @@ body {
 .shortcuts-panel-overlay.active {
   display: block;
 }
-/* ========================================
-   Stats Overview Panel
-   ======================================== */
+/* ===== STATS PANEL ===== */
 
 .stats-overview {
   background: var(--bg-secondary);
@@ -3914,9 +3883,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* ========================================
-   Toggle Switch (for Settings)
-   ======================================== */
+/* ===== UTILITIES & HELPERS ===== */
 
 .toggle-switch {
   position: relative;
@@ -4008,3 +3975,253 @@ body {
   color: var(--text-secondary);
   line-height: 1.4;
 }
+
+/* ===== TEMPLATES ===== */
+.templates-modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.templates-section {
+  margin-bottom: 2.5rem;
+  padding: 1.5rem;
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.templates-section:last-child {
+  margin-bottom: 0;
+}
+
+.templates-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.templates-section h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.templates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.template-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  gap: 1rem;
+}
+
+.template-item:hover {
+  border-color: var(--accent);
+  background: var(--bg-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.template-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.template-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin-bottom: 0.4rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.template-name::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.template-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.template-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.template-actions .btn-sm {
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.template-actions .btn-sm:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.template-actions .btn-sm svg {
+  width: 14px;
+  height: 14px;
+}
+
+.template-select-group {
+  background: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+
+.template-select-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.template-select-group select {
+  width: 100%;
+  padding: 0.625rem;
+  font-size: 0.95rem;
+  border-radius: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.template-select-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.1);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 0.95rem;
+  opacity: 0.7;
+}
+
+.form-hint {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 1.25rem;
+  line-height: 1.5;
+}
+
+.form-hint svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+/* Template modal specific improvements */
+#templatesModal .modal-content {
+  max-width: 900px;
+}
+
+#templatesModal .modal-body {
+  padding: 1.5rem;
+}
+
+#projectTemplateModal .modal-content,
+#taskTemplateModal .modal-content {
+  max-width: 600px;
+}
+
+/* Responsive design for template items */
+@media (max-width: 768px) {
+  .template-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .template-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .templates-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .templates-section-header button {
+    width: 100%;
+  }
+}
+
+/* Improve button styling in templates */
+.templates-section-header .btn-primary {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+}
+
+.templates-section-header .btn-primary:hover {
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+  transform: translateY(-1px);
+}
+
+.templates-section-header .btn-primary svg {
+  width: 16px;
+  height: 16px;
+}
+

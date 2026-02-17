@@ -73,9 +73,29 @@ Switch between kanban and table view with the toggle at the top right of the Tas
 
 ## Keyboard Shortcuts
 
-Ctrl+V -- if a URL is on your clipboard and focus is not in a text field, opens the add-bookmark modal with the URL pre-filled.
+`?` or `Shift+/` — open the keyboard shortcuts panel.
 
-Alt+T -- opens the add-task modal when on the Tasks page.
+`/` — focus the search box on the current page.
+
+`Esc` — close the open modal or panel.
+
+`Alt+B` — open the add-bookmark modal from any page.
+
+`Alt+P` — open the new project modal from any page.
+
+`Alt+T` — open the add-task modal (Tasks page only).
+
+`Ctrl+V` — if a URL is on your clipboard and you're not in a text field, opens the add-bookmark modal with the URL pre-filled.
+
+## Templates
+
+Settings → Manage Templates.
+
+Create project templates with a name, description, and tags. When you open the New Project modal, a template dropdown appears at the top — selecting one auto-fills the fields. Only fills empty fields, so you can still override anything.
+
+Task templates work the same way. Store a default title, notes, and tags. The dropdown appears at the top of the Add Task modal.
+
+Templates persist in localStorage and are included in data exports and imports.
 
 ## Data Backup
 

@@ -1,5 +1,7 @@
+// ===== CONSTANTS & STATE =====
+
 // Dashboard version
-const DASHBOARD_VERSION = '2.2.0';
+const DASHBOARD_VERSION = '2.3.0';
 
 // Default news feeds
 const DEFAULT_FEEDS = [
@@ -34,7 +36,7 @@ function escapeHtml(text) {
 }
 
 // Dashboard State
-let dashboardData = { sections: [], theme: 'dark', newsFeeds: [], redditSubs: [] };
+let dashboardData = { sections: [], theme: 'dark', newsFeeds: [], redditSubs: [], templates: { projectTemplates: [], taskTemplates: [] } };
 let currentEditingBookmarkId = null;
 let currentEditingSectionId = null;
 let currentProjectSearch = '';  // used by Tasks page search
@@ -46,14 +48,18 @@ let hideArchivedProjects = false;
 let projectsSortField = null;
 let projectsSortDir = 'asc';
 
-// Initialize
+// ===== INITIALIZATION =====
+
 document.addEventListener('DOMContentLoaded', () => {
   loadData();
   applyTheme();
   initializeEventListeners();
+  initTemplateListeners();
   renderBookmarks();
   lucide.createIcons();
 });
+
+// ===== DATA: LOAD / SAVE / MIGRATE =====
 
 function loadData() {
   const saved = localStorage.getItem('dashboardData');
@@ -95,6 +101,13 @@ function loadData() {
 
   // Migrate any missing fields (handles old exports too)
   dashboardData = migrateData(dashboardData);
+  
+  // Ensure templates structure exists
+  if (!dashboardData.templates) {
+    dashboardData.templates = { projectTemplates: [], taskTemplates: [] };
+  }
+  
+  // Persist any migration changes (URL fixes, new fields, etc.)
   saveData();
 }
 
@@ -133,11 +146,6 @@ function migrateData(data) {
     data.activeProjectId = 'proj_default';
   }
   if (!data.activeProjectId && data.projects.length > 0) data.activeProjectId = data.projects[0].id;
-
-  // Migrate old string feeds
-  if (data.newsFeeds.length > 0 && typeof data.newsFeeds[0] === 'string') {
-    data.newsFeeds = data.newsFeeds.map(url => ({ url, name: extractFeedName(url) }));
-  }
 
   // Ensure each project has required fields
   data.projects.forEach(proj => {
@@ -212,11 +220,14 @@ function migrateData(data) {
     });
   }
   // Add template arrays (v2.2.0)
-  if (!data.projectTemplates) data.projectTemplates = [];
-  if (!data.taskTemplates) data.taskTemplates = [];
+  if (!data.templates) data.templates = { projectTemplates: [], taskTemplates: [] };
+  if (!data.templates.projectTemplates) data.templates.projectTemplates = [];
+  if (!data.templates.taskTemplates) data.templates.taskTemplates = [];
 
   return data;
 }
+
+// ===== THEME =====
 
 function applyTheme() {
   const theme = dashboardData.theme || 'dark';
@@ -284,6 +295,8 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// ===== NAVIGATION =====
+
 function initializeEventListeners() {
   // Page navigation
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -306,45 +319,46 @@ function initializeEventListeners() {
     saveData();
   });
   
-  // Apply custom theme button
-  const applyCustomBtn = document.getElementById('applyCustomTheme');
-  if (applyCustomBtn) {
-    applyCustomBtn.addEventListener('click', () => {
-      dashboardData.customTheme = {
-        bgPrimary: document.getElementById('customBgPrimary').value,
-        bgSecondary: document.getElementById('customBgSecondary').value,
-        bgTertiary: document.getElementById('customBgTertiary').value,
-        textPrimary: document.getElementById('customTextPrimary').value,
-        accent: document.getElementById('customAccent').value
-      };
-      applyCustomThemeColors();
-      saveData();
-      showToast('Custom theme applied!');
-    });
-  }
+  // Custom theme color inputs
+  const bgPrimaryInput = document.getElementById('customBgPrimary');
+  const bgSecondaryInput = document.getElementById('customBgSecondary');
+  const bgTertiaryInput = document.getElementById('customBgTertiary');
+  const textPrimaryInput = document.getElementById('customTextPrimary');
+  const accentInput = document.getElementById('customAccent');
 
-  const resetCustomBtn = document.getElementById('resetCustomTheme');
-  if (resetCustomBtn) {
-    resetCustomBtn.addEventListener('click', () => {
-      dashboardData.customTheme = {
-        bgPrimary: '#1a1a2e',
-        bgSecondary: '#16213e',
-        bgTertiary: '#0f1419',
-        textPrimary: '#eaeaea',
-        accent: '#0ea5e9'
-      };
-      
-      document.getElementById('customBgPrimary').value = '#1a1a2e';
-      document.getElementById('customBgSecondary').value = '#16213e';
-      document.getElementById('customBgTertiary').value = '#0f1419';
-      document.getElementById('customTextPrimary').value = '#eaeaea';
-      document.getElementById('customAccent').value = '#0ea5e9';
-      
-      applyCustomThemeColors();
-      saveData();
-      showToast('Theme reset to default colors!');
-    });
-  }
+  // Apply custom theme button
+  document.getElementById('applyCustomTheme').addEventListener('click', () => {
+    dashboardData.customTheme = {
+      bgPrimary: bgPrimaryInput.value,
+      bgSecondary: bgSecondaryInput.value,
+      bgTertiary: bgTertiaryInput.value,
+      textPrimary: textPrimaryInput.value,
+      accent: accentInput.value
+    };
+    applyCustomThemeColors();
+    saveData();
+    showToast('Custom theme applied!');
+  });
+
+  document.getElementById('resetCustomTheme').addEventListener('click', () => {
+    dashboardData.customTheme = {
+      bgPrimary: '#1a1a2e',
+      bgSecondary: '#16213e',
+      bgTertiary: '#0f1419',
+      textPrimary: '#eaeaea',
+      accent: '#0ea5e9'
+    };
+
+    bgPrimaryInput.value = '#1a1a2e';
+    bgSecondaryInput.value = '#16213e';
+    bgTertiaryInput.value = '#0f1419';
+    textPrimaryInput.value = '#eaeaea';
+    accentInput.value = '#0ea5e9';
+
+    applyCustomThemeColors();
+    saveData();
+    showToast('Theme reset to default colors!');
+  });
 
   // Search with debouncing for better performance
   let searchTimeout;
@@ -394,15 +408,12 @@ function initializeEventListeners() {
     });
   });
 
-  const addSectionBtn = document.getElementById('addSectionBtn');
-  if (addSectionBtn) {
-    addSectionBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      currentEditingSectionId = null;
-      document.getElementById('sectionName').value = '';
-      openModal('addSectionModal');
-    });
-  }
+  document.getElementById('addSectionBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    currentEditingSectionId = null;
+    document.getElementById('sectionName').value = '';
+    openModal('addSectionModal');
+  });
 
     // Section modal
   document.getElementById('saveSectionBtn').addEventListener('click', saveSection);
@@ -429,46 +440,31 @@ function initializeEventListeners() {
     fileInput.type = 'file';
   });
 
-  // Modal close buttons
-  document.querySelectorAll('.modal-close').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const modal = btn.closest('.modal');
-      if (modal) {
-        modal.classList.remove('active');
-      }
-    });
+  // Modal close buttons — delegated so dynamically rendered modals are always covered
+  document.addEventListener('click', (e) => {
+    const closeBtn = e.target.closest('.modal-close');
+    if (closeBtn) {
+      const modal = closeBtn.closest('.modal');
+      if (modal) closeModal(modal.id);
+    }
   });
 
   // Click outside modal to close
-  document.querySelectorAll('.modal').forEach(modal => {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        modal.classList.remove('active');
-      }
-    });
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal')) {
+      closeModal(e.target.id);
+    }
   });
 
   // News manage buttons
   document.getElementById('rssManageBtn').addEventListener('click', () => {
     openModal('rssSettingsModal');
     renderNewsFeedsList();
-    const modal = document.getElementById('rssSettingsModal');
-    if (modal) {
-      modal.querySelectorAll('.modal-close').forEach(btn => {
-        btn.onclick = () => closeModal('rssSettingsModal');
-       });
-    }
   });
 
   document.getElementById('redditManageBtn').addEventListener('click', () => {
     openModal('redditSettingsModal');
     renderRedditSubsList();
-    const modal = document.getElementById('redditSettingsModal');
-    if (modal) {
-      modal.querySelectorAll('.modal-close').forEach(btn => {
-        btn.onclick = () => closeModal('redditSettingsModal');
-      });
-    }
   });
   document.getElementById('addFeedBtn').addEventListener('click', () => {
     const input = document.getElementById('newFeedInput');
@@ -498,7 +494,7 @@ function initializeEventListeners() {
     }
   });
 
-  // Export project modal buttons
+// Export project modal buttons
   const exportHtmlBtn = document.getElementById('exportHtmlBtn');
   if (exportHtmlBtn) {
     exportHtmlBtn.addEventListener('click', () => {
@@ -529,14 +525,12 @@ function initializeEventListeners() {
     checkUpdatesBtn.addEventListener('click', checkForUpdates);
   }
   
-  // Display current version
+  // Display current version in sidebar and settings
   const versionEl = document.getElementById('currentVersion');
-  if (versionEl) {
-    versionEl.textContent = DASHBOARD_VERSION;
-  }
+  if (versionEl) versionEl.textContent = DASHBOARD_VERSION;
   
-  // Sidebar footer handlers
   const sidebarVersion = document.getElementById('sidebarVersion');
+  if (sidebarVersion) sidebarVersion.textContent = 'v' + DASHBOARD_VERSION;
   if (sidebarVersion) {
     sidebarVersion.addEventListener('click', () => {
       switchPage('settings');
@@ -604,17 +598,16 @@ async function checkForUpdates() {
     
     const release = await response.json();
     const latestVersion = release.tag_name.replace('v', ''); // Remove 'v' prefix if present
-    
     // Compare versions
-    const comparison = compareVersions(latestVersion, DASHBOARD_VERSION);
+    const comparison = compareVersions(DASHBOARD_VERSION, latestVersion);
     
     if (comparison === 0) {
       // Up to date
       statusEl.textContent = '✅ You have the latest version';
       statusEl.style.color = 'var(--accent)';
       instructionsEl.innerHTML = 'No updates available.';
-    } else if (comparison > 0) {
-      // Update available (latestVersion is newer)
+    } else if (comparison < 0) {
+      // Update available (current version is LESS than latest)
       statusEl.textContent = `🔔 Update Available: v${latestVersion}`;
       statusEl.style.color = '#eab308';
       
@@ -640,10 +633,10 @@ async function checkForUpdates() {
         ` : ''}
       `;
     } else {
-      // Current version is newer than latest release (development version)
-      statusEl.textContent = `✅ You have a newer version (v${DASHBOARD_VERSION})`;
+      // Current version is newer than latest release
+      statusEl.textContent = `ℹ️ Running development version (v${DASHBOARD_VERSION})`;
       statusEl.style.color = 'var(--accent)';
-      instructionsEl.innerHTML = `Latest release is v${latestVersion}. You're running a development or pre-release version.`;
+      instructionsEl.innerHTML = `Latest stable release is v${latestVersion}. You're running a newer development version with unreleased features.`;
     }
     
     notification.style.display = 'block';
@@ -692,6 +685,8 @@ function switchPage(pageName) {
     initCalendarPage();
   }
 }
+
+// ===== BOOKMARKS =====
 
 function renderBookmarks() {
   const container = document.getElementById('sectionsContainer');
@@ -1028,7 +1023,7 @@ function handleIconUpload(e) {
   reader.readAsDataURL(file);
 }
 
-// Removed duplicate linkifyText - using secure version at line ~987
+// ===== MODALS =====
 
 function showNotesModal(bookmarkId, sectionId) {
   const section = dashboardData.sections.find(s => s.id === sectionId);
@@ -1086,6 +1081,8 @@ function showNotesModal(bookmarkId, sectionId) {
     });
   }, 0);
 }
+
+// ===== CONTEXT MENUS =====
 
 function showContextMenu(e, bookmarkId, sectionId) {
   const existingMenu = document.querySelector('.context-menu');
@@ -1450,6 +1447,8 @@ function showProjectInfoPanel(e, proj) {
   }, 0);
 }
 
+// ===== UTILITIES =====
+
 function showToast(message) {
   const existingToast = document.querySelector('.toast');
   if (existingToast) {
@@ -1470,6 +1469,8 @@ function showToast(message) {
     setTimeout(() => toast.remove(), 300);
   }, 2000);
 }
+
+// ===== KEYBOARD SHORTCUTS =====
 
 function handleKeyboardShortcuts(e) {
   // Don't trigger shortcuts when typing in inputs
@@ -1576,8 +1577,7 @@ function handleKeyboardShortcuts(e) {
       showToast('Alt+T: Switch to the Tasks page first');
     }
     return;
-  }
-  
+  }  
   // Ctrl+V - Paste URL as bookmark (enhanced)
   if (e.ctrlKey && e.key === 'v' && !isTyping) {
     e.preventDefault();
@@ -1769,7 +1769,8 @@ function updateLastExportDate() {
   showToast('Backup date updated');
 }
 
-// Stats Overview System
+// ===== STATS =====
+
 function initStatsOverview() {
   // Load visibility setting (default: true)
   const showStats = localStorage.getItem('showStatsOverview') !== 'false';
@@ -1940,7 +1941,8 @@ function calculateStats() {
   };
 }
 
-// In-App Notification System
+// ===== SETTINGS =====
+
 function initNotifications() {
   // Load settings
   const notifSettings = getNotificationSettings();
@@ -2507,6 +2509,8 @@ document.getElementById('clearAllDataBtn').addEventListener('click', () => {
   // Refresh the page to ensure clean state
   setTimeout(() => location.reload(), 1500);
 });
+
+// ===== NEWS =====
 
 function initializeRSSFeedTabs() {
   const container = document.getElementById('rssFeedsContainer');
@@ -3076,9 +3080,7 @@ function openFolder(rawPath) {
   }
 }
 
-// ============================================================
-//  PROJECT TRACKING
-// ============================================================
+// ===== PROJECTS =====
 
 let currentView = 'kanban';
 let currentEditingTaskId = null;
@@ -3430,7 +3432,8 @@ function showProjectInfo(projectId) {
   
   const descEl = document.getElementById('projectInfoDescription');
   if (proj.description) {
-    descEl.innerHTML = `<strong>Description:</strong><br>${escapeHtml(proj.description)}`;
+    // USE linkifyText instead of escapeHtml
+    descEl.innerHTML = `<strong>Description:</strong><br>${linkifyText(proj.description)}`;
     descEl.style.display = 'block';
   } else {
     descEl.style.display = 'none';
@@ -3438,8 +3441,11 @@ function showProjectInfo(projectId) {
   
   const notesEl = document.getElementById('projectInfoNotes');
   if (proj.notes) {
-    notesEl.textContent = proj.notes;
+    // USE .innerHTML with linkifyText instead of .textContent
+    notesEl.innerHTML = linkifyText(proj.notes);
     notesEl.style.display = 'block';
+    notesEl.style.fontStyle = 'normal'; // Reset style
+    notesEl.style.color = 'var(--text-primary)';
   } else {
     notesEl.textContent = 'No notes for this project.';
     notesEl.style.display = 'block';
@@ -3447,16 +3453,9 @@ function showProjectInfo(projectId) {
     notesEl.style.color = 'var(--text-secondary)';
   }
   
-  // Wire up close buttons for this modal specifically
-  const projectInfoModal = document.getElementById('projectInfoModal');
-  if (projectInfoModal) {
-    projectInfoModal.querySelectorAll('.modal-close').forEach(btn => {
-      btn.onclick = () => closeModal('projectInfoModal');
-    });
-  }
-  
   openModal('projectInfoModal');
 }
+
 
 function exportProjectAsHTML(projectId) {
   const proj = dashboardData.projects.find(p => p.id === projectId);
@@ -3916,12 +3915,13 @@ function openEditProjectModal(projectId, prefilledDate) {
   const has = folderInput.value.trim().length > 0;
   openBtn.style.display = has ? 'inline-flex' : 'none';
   clearBtn.style.display = has ? 'inline-flex' : 'none';
-
-  const editProjectModal = document.getElementById('editProjectModal');
-  if (editProjectModal) {
-    editProjectModal.querySelectorAll('.modal-close').forEach(btn => {
-      btn.onclick = () => closeModal('editProjectModal');
-    });
+  const templateSelect = document.getElementById('projectTemplateSelect');
+  if (templateSelect) {
+    templateSelect.innerHTML = '<option value="">None</option>' +
+      dashboardData.templates.projectTemplates.map(t =>
+        `<option value="${t.id}">${escapeHtml(t.name)}</option>`
+      ).join('');
+    templateSelect.value = ''; // Reset selection
   }
 
   //  Wire up Save and Cancel buttons every time modal opens
@@ -3987,7 +3987,8 @@ function goToProjectTasks(projectId) {
   switchPage('tasks');
 }
 
-// ---- Tasks page ----
+// ===== TASKS =====
+
 function initTasksPage() {
   renderProjectSelector();
   renderTasksView();
@@ -4493,7 +4494,7 @@ function showTaskInfo(taskId) {
   const notesEl = document.getElementById('taskInfoNotes');
   if (notesEl) {
     if (task.notes && task.notes.trim()) {
-      notesEl.innerHTML = `<div style="margin-bottom: 8px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.85rem;">Notes</div><div style="white-space: pre-wrap; color: var(--text-primary);">${escapeHtml(task.notes)}</div>`;
+      notesEl.innerHTML = `<div style="margin-bottom: 8px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.85rem;">Notes</div><div style="white-space: pre-wrap; color: var(--text-primary);">${linkifyText(task.notes)}</div>`;
       notesEl.style.display = 'block';
     } else {
       notesEl.style.display = 'none';
@@ -4530,14 +4531,6 @@ function showTaskInfo(taskId) {
       closeModal('taskInfoModal');
       openTaskModal(taskId);
     };
-  }
-  
-  // Wire up close buttons for this modal specifically
-  const taskInfoModal = document.getElementById('taskInfoModal');
-  if (taskInfoModal) {
-    taskInfoModal.querySelectorAll('.modal-close').forEach(btn => {
-      btn.onclick = () => closeModal('taskInfoModal');
-    });
   }
   
   openModal('taskInfoModal');
@@ -4598,7 +4591,14 @@ function openTaskModal(taskId, prefilledDate) {
     tempTodos = [];
     setTaskFolderPath('');
   }
-
+  const templateSelect = document.getElementById('taskTemplateSelect');
+  if (templateSelect) {
+    templateSelect.innerHTML = '<option value="">None</option>' +
+      dashboardData.templates.taskTemplates.map(t =>
+        `<option value="${t.id}">${escapeHtml(t.name)}</option>`
+      ).join('');
+    templateSelect.value = ''; // Reset selection
+  }
   // Wire up Save and Cancel buttons every time modal opens
   const saveBtn = document.getElementById('saveTaskBtn');
   const cancelBtn = document.getElementById('cancelTaskBtn');
@@ -4610,14 +4610,6 @@ function openTaskModal(taskId, prefilledDate) {
   if (cancelBtn) {
     cancelBtn.onclick = () => closeModal('taskModal');
   }
-  // Wire up the X close button
-  const taskModal = document.getElementById('taskModal');
-  if (taskModal) {
-    taskModal.querySelectorAll('.modal-close').forEach(btn => {
-      btn.onclick = () => closeModal('taskModal');
-    });
-  }
-
   renderTodoList();
   openModal('taskModal');
   setTimeout(() => document.getElementById('taskTitle').focus(), 100);
@@ -4860,7 +4852,7 @@ function formatDate(dateStr) {
 }
 
 
-// ==================== CALENDAR VIEW ====================
+// ===== CALENDAR =====
 
 let currentCalendarDate = new Date();
 let selectedCalendarDate = null;
@@ -4963,7 +4955,7 @@ function getHolidayForDate(date) {
     '4-5': 'Cinco de Mayo',
     '5-14': 'Flag Day',
     '9-31': 'Halloween',
-    '9-25': "Raf's B-day (Should be CS Observed)",
+    '9-25': "RAD's B-day (Should be CS Observed)",
     '11-24': 'Christmas Eve (CS Observed)',
     '11-31': "New Year's Eve"
   };
@@ -5369,7 +5361,6 @@ function showEventsSidebar(date, events) {
         }
       }
     };
-    
     // RIGHT-CLICK CONTEXT MENU
     item.oncontextmenu = (e) => {
       e.preventDefault();
@@ -5455,4 +5446,306 @@ function showCalendarDayContextMenu(e, date) {
     }
   };
   setTimeout(() => document.addEventListener('click', closeMenu), 0);
+}
+// ===== TEMPLATES =====
+
+// Global variables for template editing
+let currentEditingProjectTemplateId = null;
+let currentEditingTaskTemplateId = null;
+
+function initTemplateListeners() {
+  document.getElementById('manageTemplatesBtn').addEventListener('click', openTemplatesModal);
+  document.getElementById('addProjectTemplateBtn').addEventListener('click', openNewProjectTemplateModal);
+  document.getElementById('addTaskTemplateBtn').addEventListener('click', openNewTaskTemplateModal);
+}
+
+function openTemplatesModal() {
+  renderTemplatesModal();
+  openModal('templatesModal');
+  
+  document.getElementById('closeTemplatesBtn').onclick = () => closeModal('templatesModal');
+}
+
+// Render templates lists
+function renderTemplatesModal() {
+  const projList = document.getElementById('projectTemplatesList');
+  const taskList = document.getElementById('taskTemplatesList');
+
+  if (projList) {
+    projList.innerHTML = dashboardData.templates.projectTemplates.length === 0
+      ? '<p class="empty-state">No project templates yet</p>'
+      : dashboardData.templates.projectTemplates.map(t => `
+        <div class="template-item" data-id="${t.id}">
+          <div class="template-info">
+            <div class="template-name">${escapeHtml(t.name)}</div>
+            <div class="template-desc">${escapeHtml(t.description || '')}</div>
+          </div>
+          <div class="template-actions">
+            <button class="btn-sm" onclick="editProjectTemplate('${t.id}')">
+              <i data-lucide="edit-2"></i> Edit
+            </button>
+            <button class="btn-sm" onclick="duplicateProjectTemplate('${t.id}')">
+              <i data-lucide="copy"></i> Duplicate
+            </button>
+            <button class="btn-sm btn-danger" onclick="deleteProjectTemplate('${t.id}')">
+              <i data-lucide="trash-2"></i> Delete
+            </button>
+          </div>
+        </div>
+      `).join('');
+    lucide.createIcons();
+  }
+
+  if (taskList) {
+    taskList.innerHTML = dashboardData.templates.taskTemplates.length === 0
+      ? '<p class="empty-state">No task templates yet</p>'
+      : dashboardData.templates.taskTemplates.map(t => `
+        <div class="template-item" data-id="${t.id}">
+          <div class="template-info">
+            <div class="template-name">${escapeHtml(t.name)}</div>
+            <div class="template-desc">${escapeHtml(t.description || '')}</div>
+          </div>
+          <div class="template-actions">
+            <button class="btn-sm" onclick="editTaskTemplate('${t.id}')">
+              <i data-lucide="edit-2"></i> Edit
+            </button>
+            <button class="btn-sm" onclick="duplicateTaskTemplate('${t.id}')">
+              <i data-lucide="copy"></i> Duplicate
+            </button>
+            <button class="btn-sm btn-danger" onclick="deleteTaskTemplate('${t.id}')">
+              <i data-lucide="trash-2"></i> Delete
+            </button>
+          </div>
+        </div>
+      `).join('');
+    lucide.createIcons();
+  }
+}
+function openNewProjectTemplateModal() {
+  document.getElementById('projectTemplateModalTitle').textContent = 'New Project Template';
+  document.getElementById('projectTemplateName').value = '';
+  document.getElementById('projectTemplateDescription').value = '';
+  document.getElementById('projectTemplateTags').value = '';
+  
+  currentEditingProjectTemplateId = null;
+  openModal('projectTemplateModal');
+
+  document.getElementById('saveProjectTemplateBtn').onclick = saveProjectTemplate;
+  document.getElementById('cancelProjectTemplateBtn').onclick = () => closeModal('projectTemplateModal');
+}
+
+function editProjectTemplate(id) {
+  const tpl = dashboardData.templates.projectTemplates.find(t => t.id === id);
+  if (!tpl) return;
+  
+  currentEditingProjectTemplateId = id;
+  document.getElementById('projectTemplateModalTitle').textContent = 'Edit Project Template';
+  document.getElementById('projectTemplateName').value = tpl.name;
+  document.getElementById('projectTemplateDescription').value = tpl.description || '';
+  document.getElementById('projectTemplateTags').value = (tpl.tags || []).join(', ');
+  
+  openModal('projectTemplateModal');
+
+  document.getElementById('saveProjectTemplateBtn').onclick = saveProjectTemplate;
+  document.getElementById('cancelProjectTemplateBtn').onclick = () => closeModal('projectTemplateModal');
+}
+
+function saveProjectTemplate() {
+  const name = document.getElementById('projectTemplateName').value.trim();
+  if (!name) {
+    alert('Please enter a template name');
+    return;
+  }
+  
+  const description = document.getElementById('projectTemplateDescription').value.trim();
+  const tagsInput = document.getElementById('projectTemplateTags').value.trim();
+  const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+  
+  if (currentEditingProjectTemplateId) {
+    // Edit existing
+    const tpl = dashboardData.templates.projectTemplates.find(t => t.id === currentEditingProjectTemplateId);
+    if (tpl) {
+      tpl.name = name;
+      tpl.description = description;
+      tpl.tags = tags;
+    }
+  } else {
+    // Create new
+    const newTemplate = {
+      id: 'pt_' + Date.now(),
+      name,
+      description,
+      tags,
+      columns: [
+        { id: 'col_' + Date.now() + '_1', name: 'To Do' },
+        { id: 'col_' + Date.now() + '_2', name: 'In Progress' },
+        { id: 'col_' + Date.now() + '_3', name: 'Done' }
+      ],
+      tasks: []
+    };
+    dashboardData.templates.projectTemplates.push(newTemplate);
+  }
+  
+  saveData();
+  closeModal('projectTemplateModal');
+  renderTemplatesModal();
+}
+
+function duplicateProjectTemplate(id) {
+  const tpl = dashboardData.templates.projectTemplates.find(t => t.id === id);
+  if (!tpl) return;
+  
+  const copy = JSON.parse(JSON.stringify(tpl));
+  copy.id = 'pt_' + Date.now();
+  copy.name = tpl.name + ' (Copy)';
+  
+  dashboardData.templates.projectTemplates.push(copy);
+  saveData();
+  renderTemplatesModal();
+}
+
+function deleteProjectTemplate(id) {
+  if (!confirm('Delete this project template?')) return;
+  
+  dashboardData.templates.projectTemplates = 
+    dashboardData.templates.projectTemplates.filter(t => t.id !== id);
+  saveData();
+  renderTemplatesModal();
+}
+
+// ===== TASK TEMPLATES =====
+
+function openNewTaskTemplateModal() {
+  document.getElementById('taskTemplateModalTitle').textContent = 'New Task Template';
+  document.getElementById('taskTemplateName').value = '';
+  document.getElementById('taskTemplateDescription').value = '';
+  document.getElementById('taskTemplateTitle').value = '';
+  document.getElementById('taskTemplateNotes').value = '';
+  document.getElementById('taskTemplateTags').value = '';
+  
+  currentEditingTaskTemplateId = null;
+  openModal('taskTemplateModal');
+
+  document.getElementById('saveTaskTemplateBtn').onclick = saveTaskTemplate;
+  document.getElementById('cancelTaskTemplateBtn').onclick = () => closeModal('taskTemplateModal');
+}
+
+function editTaskTemplate(id) {
+  const tpl = dashboardData.templates.taskTemplates.find(t => t.id === id);
+  if (!tpl) return;
+  
+  currentEditingTaskTemplateId = id;
+  document.getElementById('taskTemplateModalTitle').textContent = 'Edit Task Template';
+  document.getElementById('taskTemplateName').value = tpl.name;
+  document.getElementById('taskTemplateDescription').value = tpl.description || '';
+  document.getElementById('taskTemplateTitle').value = tpl.title || '';
+  document.getElementById('taskTemplateNotes').value = tpl.notes || '';
+  document.getElementById('taskTemplateTags').value = (tpl.tags || []).join(', ');
+  
+  openModal('taskTemplateModal');
+
+  document.getElementById('saveTaskTemplateBtn').onclick = saveTaskTemplate;
+  document.getElementById('cancelTaskTemplateBtn').onclick = () => closeModal('taskTemplateModal');
+}
+
+function saveTaskTemplate() {
+  const name = document.getElementById('taskTemplateName').value.trim();
+  if (!name) {
+    alert('Please enter a template name');
+    return;
+  }
+  
+  const description = document.getElementById('taskTemplateDescription').value.trim();
+  const title = document.getElementById('taskTemplateTitle').value.trim();
+  const notes = document.getElementById('taskTemplateNotes').value.trim();
+  const tagsInput = document.getElementById('taskTemplateTags').value.trim();
+  const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+  
+  if (currentEditingTaskTemplateId) {
+    // Edit existing
+    const tpl = dashboardData.templates.taskTemplates.find(t => t.id === currentEditingTaskTemplateId);
+    if (tpl) {
+      tpl.name = name;
+      tpl.description = description;
+      tpl.title = title;
+      tpl.notes = notes;
+      tpl.tags = tags;
+    }
+  } else {
+    // Create new
+    const newTemplate = {
+      id: 'tt_' + Date.now(),
+      name,
+      description,
+      title,
+      notes,
+      tags,
+      todos: []
+    };
+    dashboardData.templates.taskTemplates.push(newTemplate);
+  }
+  
+  saveData();
+  closeModal('taskTemplateModal');
+  renderTemplatesModal();
+}
+
+function duplicateTaskTemplate(id) {
+  const tpl = dashboardData.templates.taskTemplates.find(t => t.id === id);
+  if (!tpl) return;
+  
+  const copy = JSON.parse(JSON.stringify(tpl));
+  copy.id = 'tt_' + Date.now();
+  copy.name = tpl.name + ' (Copy)';
+  
+  dashboardData.templates.taskTemplates.push(copy);
+  saveData();
+  renderTemplatesModal();
+}
+
+function deleteTaskTemplate(id) {
+  if (!confirm('Delete this task template?')) return;
+  
+  dashboardData.templates.taskTemplates = 
+    dashboardData.templates.taskTemplates.filter(t => t.id !== id);
+  saveData();
+  renderTemplatesModal();
+}
+
+// ===== APPLY TEMPLATES TO MODALS =====
+function applyProjectTemplate() {
+  const select = document.getElementById('projectTemplateSelect');
+  const id = select.value;
+  if (!id) return;
+  
+  const tpl = dashboardData.templates.projectTemplates.find(t => t.id === id);
+  if (!tpl) return;
+  
+  // Prefill fields - using YOUR modal's field IDs
+  const nameInput = document.getElementById('editProjectName');
+  const descInput = document.getElementById('editProjectDescription');
+  const tagsInput = document.getElementById('editProjectTags');
+  
+  if (nameInput && !nameInput.value) nameInput.value = tpl.name;
+  if (descInput && !descInput.value && tpl.description) descInput.value = tpl.description;
+  if (tagsInput && tpl.tags?.length) tagsInput.value = tpl.tags.join(', ');
+}
+
+
+function applyTaskTemplate() {
+  const select = document.getElementById('taskTemplateSelect');
+  const id = select.value;
+  if (!id) return;
+  
+  const tpl = dashboardData.templates.taskTemplates.find(t => t.id === id);
+  if (!tpl) return;
+  
+  // Prefill fields - using YOUR modal's field IDs
+  const titleInput = document.getElementById('taskTitle');
+  const notesInput = document.getElementById('taskNotes');
+  const tagsInput = document.getElementById('taskTags');
+  
+  if (titleInput && !titleInput.value) titleInput.value = tpl.title || tpl.name;
+  if (notesInput && !notesInput.value && tpl.notes) notesInput.value = tpl.notes;
+  if (tagsInput && tpl.tags?.length) tagsInput.value = tpl.tags.join(', ');
 }
