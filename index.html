@@ -77,7 +77,7 @@
       </a>
     </nav>
     <div class="sidebar-footer">
-      <span class="sidebar-version" id="sidebarVersion">v2.3.0</span>
+      <span class="sidebar-version" id="sidebarVersion">v2.4.0</span>
       <button class="sidebar-help-btn" id="sidebarHelpBtn" title="Keyboard shortcuts">
         <i data-lucide="help-circle"></i>
       </button>
@@ -520,7 +520,7 @@
         <div class="setting-group">
           <h3>Updates</h3>
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-            <span style="color: var(--text-secondary);">Current Version: <strong id="currentVersion">2.3.0</strong></span>
+            <span style="color: var(--text-secondary);">Current Version: <strong id="currentVersion">2.4.0</strong></span>
           </div>
 <!--Update checker-->
           <button id="checkUpdatesBtn" class="btn btn-primary">Check for Updates</button>
@@ -674,7 +674,7 @@
         <div class="form-group template-select-group" style="margin-bottom: 1.5rem;">
         <label for="taskTemplateSelect">Create from template</label>
         </label>
-        <select id="taskTemplateSelect" onchange="applyTaskTemplate()">
+        <select id="taskTemplateSelect">
           <option value="">None</option>
         </select>
       </div>
@@ -784,7 +784,7 @@
         <div class="form-group template-select-group">
         <label for="projectTemplateSelect">Create from template</label>
         </label>
-        <select id="projectTemplateSelect" onchange="applyProjectTemplate()">
+        <select id="projectTemplateSelect">
           <option value="">None</option>
         </select>
       </div>
@@ -959,6 +959,8 @@
           <input type="text" id="projectTemplateTags" class="form-control" placeholder="Separate tags with commas">
         </div>
         
+        <div id="linkedTaskTemplatesContainer"></div>
+
         <div class="form-hint">
           <i data-lucide="info"></i>
           <span>Templates include default columns (To Do, In Progress, Done). You can customize them after creating a project from this template.</span>
@@ -1002,6 +1004,15 @@
         <div class="form-group">
           <label for="taskTemplateTags">Tags (optional)</label>
           <input type="text" id="taskTemplateTags" class="form-control" placeholder="Separate tags with commas">
+        </div>
+
+        <div class="form-group">
+          <label>Todo Items (optional)</label>
+          <div id="taskTemplateTodoList" class="todo-list"></div>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <input type="text" id="taskTemplateTodoInput" class="form-control" placeholder="Add a todo item...">
+            <button type="button" class="btn btn-secondary" id="taskTemplateTodoAddBtn">Add</button>
+          </div>
         </div>
       </div>
       <div class="modal-footer">

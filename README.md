@@ -1,6 +1,6 @@
 # Homepage Dashboard
 
-**v2.3.0** — Self-contained personal dashboard. Runs entirely offline in the browser. No server, no framework, no accounts.
+**v2.4.0** — Self-contained personal dashboard. Runs entirely offline in the browser. No server, no framework, no accounts.
 
 ## Installation
 

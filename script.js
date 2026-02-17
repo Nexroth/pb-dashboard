@@ -1,7 +1,7 @@
 // ===== CONSTANTS & STATE =====
 
 // Dashboard version
-const DASHBOARD_VERSION = '2.3.0';
+const DASHBOARD_VERSION = '2.4.0';
 
 // Default news feeds
 const DEFAULT_FEEDS = [
@@ -223,6 +223,11 @@ function migrateData(data) {
   if (!data.templates) data.templates = { projectTemplates: [], taskTemplates: [] };
   if (!data.templates.projectTemplates) data.templates.projectTemplates = [];
   if (!data.templates.taskTemplates) data.templates.taskTemplates = [];
+
+  // Add linkedTaskTemplates to project templates (v2.4.0)
+  data.templates.projectTemplates.forEach(pt => {
+    if (!pt.linkedTaskTemplates) pt.linkedTaskTemplates = [];
+  });
 
   return data;
 }
@@ -3915,6 +3920,7 @@ function openEditProjectModal(projectId, prefilledDate) {
   const has = folderInput.value.trim().length > 0;
   openBtn.style.display = has ? 'inline-flex' : 'none';
   clearBtn.style.display = has ? 'inline-flex' : 'none';
+  selectedProjectTemplateId = null;
   const templateSelect = document.getElementById('projectTemplateSelect');
   if (templateSelect) {
     templateSelect.innerHTML = '<option value="">None</option>' +
@@ -3923,6 +3929,9 @@ function openEditProjectModal(projectId, prefilledDate) {
       ).join('');
     templateSelect.value = ''; // Reset selection
   }
+  // Clear template task summary
+  const summaryEl = document.getElementById('templateTaskSummary');
+  if (summaryEl) summaryEl.remove();
 
   //  Wire up Save and Cancel buttons every time modal opens
   const saveBtn = document.getElementById('saveEditProjectBtn');
@@ -3955,13 +3964,18 @@ function saveEditProject() {
     const proj = dashboardData.projects.find(p => p.id === editingProjectId);
     if (proj) { proj.name = name; proj.description = description; proj.notes = notes; proj.dueDate = dueDate; proj.folderPath = folderPath; proj.status = status; proj.tags = tags; }
   } else {
-    dashboardData.projects.push({
+    const newProject = {
       id: 'proj_' + Date.now(),
       name, description, notes, dueDate, folderPath, tags,
       status: status,
       columns: ['Not Started', 'On Hold', 'In Progress', 'Review', 'Completed'],
       tasks: []
-    });
+    };
+    dashboardData.projects.push(newProject);
+    if (selectedProjectTemplateId) {
+      instantiateLinkedTasks(newProject, selectedProjectTemplateId);
+      selectedProjectTemplateId = null;
+    }
   }
   saveData();
   closeModal('editProjectModal');
@@ -5452,11 +5466,18 @@ function showCalendarDayContextMenu(e, date) {
 // Global variables for template editing
 let currentEditingProjectTemplateId = null;
 let currentEditingTaskTemplateId = null;
+let selectedProjectTemplateId = null;
 
 function initTemplateListeners() {
   document.getElementById('manageTemplatesBtn').addEventListener('click', openTemplatesModal);
   document.getElementById('addProjectTemplateBtn').addEventListener('click', openNewProjectTemplateModal);
   document.getElementById('addTaskTemplateBtn').addEventListener('click', openNewTaskTemplateModal);
+
+  const projectTemplateSelect = document.getElementById('projectTemplateSelect');
+  if (projectTemplateSelect) projectTemplateSelect.addEventListener('change', applyProjectTemplate);
+
+  const taskTemplateSelect = document.getElementById('taskTemplateSelect');
+  if (taskTemplateSelect) taskTemplateSelect.addEventListener('change', applyTaskTemplate);
 }
 
 function openTemplatesModal() {
@@ -5521,13 +5542,37 @@ function renderTemplatesModal() {
     lucide.createIcons();
   }
 }
+function renderLinkedTaskChecklist(selectedIds) {
+  const container = document.getElementById('linkedTaskTemplatesContainer');
+  if (!container) return;
+  const taskTemplates = dashboardData.templates.taskTemplates;
+  if (taskTemplates.length === 0) {
+    container.innerHTML = '<div class="form-group"><label>Linked Task Templates</label><p class="empty-state" style="padding:1rem;font-size:0.9rem;">No task templates yet — create some in the Templates library</p></div>';
+    return;
+  }
+  container.innerHTML = `
+    <div class="form-group">
+      <label>Linked Task Templates</label>
+      <div class="linked-task-checklist">
+        ${taskTemplates.map(tt => `
+          <label>
+            <input type="checkbox" class="linked-task-checkbox" value="${tt.id}" ${selectedIds.includes(tt.id) ? 'checked' : ''}>
+            ${escapeHtml(tt.name)}
+          </label>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function openNewProjectTemplateModal() {
   document.getElementById('projectTemplateModalTitle').textContent = 'New Project Template';
   document.getElementById('projectTemplateName').value = '';
   document.getElementById('projectTemplateDescription').value = '';
   document.getElementById('projectTemplateTags').value = '';
-  
+
   currentEditingProjectTemplateId = null;
+  renderLinkedTaskChecklist([]);
   openModal('projectTemplateModal');
 
   document.getElementById('saveProjectTemplateBtn').onclick = saveProjectTemplate;
@@ -5537,13 +5582,14 @@ function openNewProjectTemplateModal() {
 function editProjectTemplate(id) {
   const tpl = dashboardData.templates.projectTemplates.find(t => t.id === id);
   if (!tpl) return;
-  
+
   currentEditingProjectTemplateId = id;
   document.getElementById('projectTemplateModalTitle').textContent = 'Edit Project Template';
   document.getElementById('projectTemplateName').value = tpl.name;
   document.getElementById('projectTemplateDescription').value = tpl.description || '';
   document.getElementById('projectTemplateTags').value = (tpl.tags || []).join(', ');
-  
+  renderLinkedTaskChecklist(tpl.linkedTaskTemplates || []);
+
   openModal('projectTemplateModal');
 
   document.getElementById('saveProjectTemplateBtn').onclick = saveProjectTemplate;
@@ -5556,11 +5602,12 @@ function saveProjectTemplate() {
     alert('Please enter a template name');
     return;
   }
-  
+
   const description = document.getElementById('projectTemplateDescription').value.trim();
   const tagsInput = document.getElementById('projectTemplateTags').value.trim();
   const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
-  
+  const linkedTaskTemplates = Array.from(document.querySelectorAll('.linked-task-checkbox:checked')).map(cb => cb.value);
+
   if (currentEditingProjectTemplateId) {
     // Edit existing
     const tpl = dashboardData.templates.projectTemplates.find(t => t.id === currentEditingProjectTemplateId);
@@ -5568,6 +5615,7 @@ function saveProjectTemplate() {
       tpl.name = name;
       tpl.description = description;
       tpl.tags = tags;
+      tpl.linkedTaskTemplates = linkedTaskTemplates;
     }
   } else {
     // Create new
@@ -5576,6 +5624,7 @@ function saveProjectTemplate() {
       name,
       description,
       tags,
+      linkedTaskTemplates,
       columns: [
         { id: 'col_' + Date.now() + '_1', name: 'To Do' },
         { id: 'col_' + Date.now() + '_2', name: 'In Progress' },
@@ -5585,7 +5634,7 @@ function saveProjectTemplate() {
     };
     dashboardData.templates.projectTemplates.push(newTemplate);
   }
-  
+
   saveData();
   closeModal('projectTemplateModal');
   renderTemplatesModal();
@@ -5615,6 +5664,44 @@ function deleteProjectTemplate(id) {
 
 // ===== TASK TEMPLATES =====
 
+let tempTemplateTodos = [];
+
+function renderTaskTemplateTodoList() {
+  const list = document.getElementById('taskTemplateTodoList');
+  if (!list) return;
+  if (tempTemplateTodos.length === 0) {
+    list.innerHTML = '<div class="todo-empty">No items yet</div>';
+    return;
+  }
+  list.innerHTML = tempTemplateTodos.map((todo, i) => `
+    <div class="todo-item">
+      <input type="text" class="todo-text-input form-control" data-index="${i}" value="${escapeHtml(todo.text)}">
+      <button type="button" class="todo-delete" data-index="${i}" title="Remove">&times;</button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.todo-text-input').forEach(input => {
+    input.addEventListener('input', () => {
+      tempTemplateTodos[parseInt(input.dataset.index)].text = input.value;
+    });
+  });
+  list.querySelectorAll('.todo-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tempTemplateTodos.splice(parseInt(btn.dataset.index), 1);
+      renderTaskTemplateTodoList();
+    });
+  });
+}
+
+function addTaskTemplateTodoItem() {
+  const input = document.getElementById('taskTemplateTodoInput');
+  const text = input.value.trim();
+  if (!text) return;
+  tempTemplateTodos.push({ text, done: false });
+  input.value = '';
+  renderTaskTemplateTodoList();
+}
+
 function openNewTaskTemplateModal() {
   document.getElementById('taskTemplateModalTitle').textContent = 'New Task Template';
   document.getElementById('taskTemplateName').value = '';
@@ -5622,12 +5709,18 @@ function openNewTaskTemplateModal() {
   document.getElementById('taskTemplateTitle').value = '';
   document.getElementById('taskTemplateNotes').value = '';
   document.getElementById('taskTemplateTags').value = '';
+  tempTemplateTodos = [];
+  renderTaskTemplateTodoList();
   
   currentEditingTaskTemplateId = null;
   openModal('taskTemplateModal');
 
   document.getElementById('saveTaskTemplateBtn').onclick = saveTaskTemplate;
   document.getElementById('cancelTaskTemplateBtn').onclick = () => closeModal('taskTemplateModal');
+  document.getElementById('taskTemplateTodoAddBtn').onclick = addTaskTemplateTodoItem;
+  document.getElementById('taskTemplateTodoInput').onkeypress = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addTaskTemplateTodoItem(); }
+  };
 }
 
 function editTaskTemplate(id) {
@@ -5641,11 +5734,17 @@ function editTaskTemplate(id) {
   document.getElementById('taskTemplateTitle').value = tpl.title || '';
   document.getElementById('taskTemplateNotes').value = tpl.notes || '';
   document.getElementById('taskTemplateTags').value = (tpl.tags || []).join(', ');
+  tempTemplateTodos = (tpl.todos || []).map(t => ({ ...t }));
+  renderTaskTemplateTodoList();
   
   openModal('taskTemplateModal');
 
   document.getElementById('saveTaskTemplateBtn').onclick = saveTaskTemplate;
   document.getElementById('cancelTaskTemplateBtn').onclick = () => closeModal('taskTemplateModal');
+  document.getElementById('taskTemplateTodoAddBtn').onclick = addTaskTemplateTodoItem;
+  document.getElementById('taskTemplateTodoInput').onkeypress = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addTaskTemplateTodoItem(); }
+  };
 }
 
 function saveTaskTemplate() {
@@ -5670,6 +5769,7 @@ function saveTaskTemplate() {
       tpl.title = title;
       tpl.notes = notes;
       tpl.tags = tags;
+      tpl.todos = tempTemplateTodos.map(t => ({ ...t }));
     }
   } else {
     // Create new
@@ -5680,7 +5780,7 @@ function saveTaskTemplate() {
       title,
       notes,
       tags,
-      todos: []
+      todos: tempTemplateTodos.map(t => ({ ...t }))
     };
     dashboardData.templates.taskTemplates.push(newTemplate);
   }
@@ -5712,23 +5812,73 @@ function deleteTaskTemplate(id) {
   renderTemplatesModal();
 }
 
+function instantiateLinkedTasks(project, templateId) {
+  const tpl = dashboardData.templates.projectTemplates.find(t => t.id === templateId);
+  if (!tpl || !tpl.linkedTaskTemplates || tpl.linkedTaskTemplates.length === 0) return;
+
+  const now = Date.now();
+  tpl.linkedTaskTemplates.forEach((ttId, index) => {
+    const taskTpl = dashboardData.templates.taskTemplates.find(tt => tt.id === ttId);
+    if (!taskTpl) return; // silently skip deleted templates
+
+    project.tasks.push({
+      id: 'task_' + now + '_' + index,
+      title: taskTpl.title || taskTpl.name,
+      notes: taskTpl.notes || '',
+      todos: taskTpl.todos ? JSON.parse(JSON.stringify(taskTpl.todos)).map(t => ({ ...t, done: false })) : [],
+      tags: taskTpl.tags ? (Array.isArray(taskTpl.tags) ? taskTpl.tags.join(', ') : taskTpl.tags) : '',
+      priority: 'medium',
+      status: project.columns[0],
+      dueDate: '',
+      folderPath: ''
+    });
+  });
+}
+
 // ===== APPLY TEMPLATES TO MODALS =====
 function applyProjectTemplate() {
   const select = document.getElementById('projectTemplateSelect');
   const id = select.value;
-  if (!id) return;
-  
-  const tpl = dashboardData.templates.projectTemplates.find(t => t.id === id);
-  if (!tpl) return;
-  
-  // Prefill fields - using YOUR modal's field IDs
+
+  // Remove existing summary
+  const existingSummary = document.getElementById('templateTaskSummary');
+  if (existingSummary) existingSummary.remove();
+
+  // Always clear fields first so switching templates or selecting None is clean
   const nameInput = document.getElementById('editProjectName');
   const descInput = document.getElementById('editProjectDescription');
   const tagsInput = document.getElementById('editProjectTags');
-  
-  if (nameInput && !nameInput.value) nameInput.value = tpl.name;
-  if (descInput && !descInput.value && tpl.description) descInput.value = tpl.description;
-  if (tagsInput && tpl.tags?.length) tagsInput.value = tpl.tags.join(', ');
+  if (nameInput) nameInput.value = '';
+  if (descInput) descInput.value = '';
+  if (tagsInput) tagsInput.value = '';
+
+  if (!id) {
+    selectedProjectTemplateId = null;
+    return;
+  }
+
+  const tpl = dashboardData.templates.projectTemplates.find(t => t.id === id);
+  if (!tpl) return;
+
+  selectedProjectTemplateId = id;
+
+  if (nameInput) nameInput.value = tpl.name || '';
+  if (descInput) descInput.value = tpl.description || '';
+  if (tagsInput) tagsInput.value = (tpl.tags || []).join(', ');
+
+  // Show linked task summary
+  if (tpl.linkedTaskTemplates && tpl.linkedTaskTemplates.length > 0) {
+    const count = tpl.linkedTaskTemplates.filter(ttId =>
+      dashboardData.templates.taskTemplates.some(tt => tt.id === ttId)
+    ).length;
+    if (count > 0) {
+      const summary = document.createElement('div');
+      summary.id = 'templateTaskSummary';
+      summary.className = 'template-task-summary';
+      summary.textContent = `Will create ${count} task(s) from template`;
+      select.parentElement.after(summary);
+    }
+  }
 }
 
 

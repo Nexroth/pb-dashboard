@@ -4138,6 +4138,39 @@ body {
   box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.1);
 }
 
+.linked-task-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.linked-task-checklist label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: var(--transition);
+}
+
+.linked-task-checklist label:hover {
+  background: var(--bg-primary);
+}
+
+.template-task-summary {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+}
+
 .empty-state {
   text-align: center;
   padding: 3rem 1rem;
