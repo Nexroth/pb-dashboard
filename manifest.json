@@ -1,6 +1,7 @@
 {
   "name": "PB Dashboard - Personal Bookmark & Project Tracker",
   "short_name": "PB Dashboard",
+  "version": "2.4.0",
   "description": "Self-contained bookmark and project management dashboard with calendar, tasks, and news aggregation",
   "start_url": "./index.html",
   "display": "standalone",
