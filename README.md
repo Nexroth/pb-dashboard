@@ -2,6 +2,8 @@
 
 **v2.4.0** — Self-contained personal dashboard. Runs entirely offline in the browser. No server, no framework, no accounts.
 
+**📖 [Complete User Guide](USER_GUIDE.md)** — Detailed documentation for all features with step-by-step instructions.
+
 ## Installation
 
 1. Go to [Releases](https://github.com/Nexroth/pb-dashboard/releases)
@@ -90,6 +92,7 @@ The application blocks javascript: URLs in bookmarks and sanitizes all user inpu
 - `favicon.png` — browser icon
 - `manifest.json` — PWA manifest for desktop install
 - `README.md` — this file
+- `USER_GUIDE.md` — comprehensive feature documentation with step-by-step instructions
 - `Customization.txt` — setup guide for feeds, themes, and options
 - `Security_Audit.md` — security review and XSS protection details
 
