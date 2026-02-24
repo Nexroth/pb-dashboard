@@ -3,7 +3,11 @@
 // Dashboard version
 const DASHBOARD_VERSION = '2.4.0';
 
-// Default news feeds
+// SECURITY: Disable all external network calls for air-gapped deployment
+// Set to false to enable RSS/Reddit features (requires internet and external APIs)
+const ALLOW_EXTERNAL_NETWORK = false;
+
+// Default news feeds (only used if ALLOW_EXTERNAL_NETWORK is true)
 const DEFAULT_FEEDS = [
   'https://news.ycombinator.com/rss',
   'https://www.bleepingcomputer.com/feed/',
@@ -587,6 +591,18 @@ async function checkForUpdates() {
   const notification = document.getElementById('updateNotification');
   const statusEl = document.getElementById('updateStatus');
   const instructionsEl = document.getElementById('updateInstructions');
+  
+  // SECURITY: Block external network calls
+  if (!ALLOW_EXTERNAL_NETWORK) {
+    notification.style.display = 'block';
+    statusEl.textContent = '🔒 External network access disabled';
+    statusEl.style.color = 'var(--text-secondary)';
+    instructionsEl.innerHTML = `
+      Update checking requires GitHub API access and is disabled for security.<br>
+      Contact your IT department for approved dashboard updates.
+    `;
+    return;
+  }
   
   // Show loading state
   btn.textContent = 'Checking...';
@@ -2600,6 +2616,25 @@ function extractFeedName(feed) {
 
 async function loadSingleRSSFeed(feedUrl) {
   const content = document.getElementById('rssContent');
+  
+  // SECURITY: Block external network calls
+  if (!ALLOW_EXTERNAL_NETWORK) {
+    content.innerHTML = `
+      <div class="news-error">
+        <i data-lucide="shield-off"></i>
+        <div>
+          <div>External network access is disabled</div>
+          <div style="font-size: 0.9em; margin-top: 8px; opacity: 0.8;">
+            RSS feeds require external API calls. For security, this feature is disabled.
+            Set ALLOW_EXTERNAL_NETWORK = true in script.js to enable (not recommended for production).
+          </div>
+        </div>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+  
   content.innerHTML = '<div class="news-loading">Loading feed...</div>';
 
   const url = typeof feedUrl === 'string' ? feedUrl : feedUrl.url || '';
@@ -2827,6 +2862,25 @@ async function fetchRSS(url, limit) {
 
 async function loadReddit(subreddit) {
   const content = document.getElementById('redditContent');
+  
+  // SECURITY: Block external network calls
+  if (!ALLOW_EXTERNAL_NETWORK) {
+    content.innerHTML = `
+      <div class="news-error">
+        <i data-lucide="shield-off"></i>
+        <div>
+          <div>External network access is disabled</div>
+          <div style="font-size: 0.9em; margin-top: 8px; opacity: 0.8;">
+            Reddit integration requires external API calls. For security, this feature is disabled.
+            Set ALLOW_EXTERNAL_NETWORK = true in script.js to enable (not recommended for production).
+          </div>
+        </div>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+  
   content.innerHTML = '<div class="news-loading">Loading r/' + subreddit + '...</div>';
 
   try {
@@ -4969,7 +5023,7 @@ function getHolidayForDate(date) {
     '4-5': 'Cinco de Mayo',
     '5-14': 'Flag Day',
     '9-31': 'Halloween',
-    '9-25': "RAD's B-day (Should be CS Observed)",
+    '9-25': "Best day (Should be CS Observed)",
     '11-24': 'Christmas Eve (CS Observed)',
     '11-31': "New Year's Eve"
   };

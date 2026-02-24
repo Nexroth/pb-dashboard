@@ -1,6 +1,8 @@
 # Homepage Dashboard
 
-**v2.4.0** — Self-contained personal dashboard. Runs entirely offline in the browser. No server, no framework, no accounts.
+**v2.4.0** — Self-contained personal dashboard. **Runs entirely offline** in the browser. No server, no framework, no accounts, **no external network calls**.
+
+**🔒 [Security Documentation](SECURITY.md)** — Complete security hardening guide for enterprise deployment.
 
 **📖 [Complete User Guide](USER_GUIDE.md)** — Detailed documentation for all features with step-by-step instructions.
 
@@ -98,8 +100,12 @@ The application blocks javascript: URLs in bookmarks and sanitizes all user inpu
 
 ## Tech
 
-Vanilla JS. Dependencies loaded via CDN:
-- Lucide icons
-- SortableJS (drag and drop)
-- rss2json.com (RSS parsing)
-- corsproxy.io (Reddit access)
+**100% Offline — Zero External Dependencies**
+
+All libraries are bundled locally for security:
+- Lucide icons (v0.263.1) — bundled in `libs/`
+- SortableJS (v1.15.0) — bundled in `libs/`
+
+**No CDNs, no external APIs, no network calls.**
+
+Features requiring external services (RSS feeds, Reddit, update checker) are disabled by default and show security notices. See SECURITY.md for details.
