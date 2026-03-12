@@ -1,6 +1,6 @@
 # Homepage Dashboard
 
-**v2.4.0** — Self-contained personal dashboard. **Runs entirely offline** in the browser. No server, no framework, no accounts, **no external network calls**.
+**v2.5.0** — Self-contained personal dashboard. **Runs entirely offline** in the browser. No server, no framework, no accounts, **no external network calls**.
 
 **🔒 [Security Documentation](SECURITY.md)** — Complete security hardening guide for enterprise deployment.
 
@@ -11,7 +11,7 @@
 1. Go to [Releases](https://github.com/Nexroth/pb-dashboard/releases)
 2. Download the latest `pb-dashboard.zip`
 3. Extract the ZIP file
-4. Open `index.html` in any browser
+4. Open `index.html` in any browser **The Notes module has been tested in chromium-based browsers (Chrome, Edge, Brave, etc). Probably wont work on Friefox**
 
 Everything runs offline, all data saves to localStorage automatically.
 
