@@ -1,6 +1,7 @@
 # Homepage Dashboard
 
-**v2.4.0** — Self-contained personal dashboard. **Runs entirely offline** in the browser. No server, no framework, no accounts, **no external network calls**.
+
+**v2.5.0** — Self-contained personal dashboard. **Runs entirely offline** in the browser. No server, no framework, no accounts, **no external network calls**.
 
 **🔒 [Security Documentation](SECURITY.md)** — Complete security hardening guide for enterprise deployment.
 
@@ -26,6 +27,20 @@ Each bookmark can have multiple tags. They show up as small badges on the card. 
 `Ctrl+V` with a URL on the clipboard opens the add-bookmark modal with the URL pre-filled.
 
 A collapsible stats panel at the top of the Home page shows bookmarks, active projects, task completion rate, and overdue counts at a glance.
+
+### Notes
+
+A local Markdown editor built into the dashboard. Point it at any folder on your computer and it becomes your notes vault — files are stored as plain `.md` files on disk, so they survive browser cache clears and work seamlessly alongside Obsidian, VS Code, or any text editor.
+
+Requires Chrome or Edge (v86+) for the File System Access API. Firefox and Safari are not supported.
+
+- **File tree** in the left panel with drag-and-drop to reorganize files and folders
+- **Split edit/preview** — toggle between raw Markdown and rendered preview, or keep both
+- **Wikilinks** — type `[[note name]]` to link between notes; links are clickable in preview
+- **Backlinks panel** — see every note that links to the one you're currently reading
+- **Search** — filters the file tree as you type
+- Folder state (open/collapsed) persists across sessions via localStorage
+- Your selected vault folder is remembered between sessions (re-prompts for permission on each browser restart)
 
 ### Projects
 
@@ -88,8 +103,9 @@ The application blocks javascript: URLs in bookmarks and sanitizes all user inpu
 ## Files
 
 - `index.html` — page structure
-- `script.js` — all logic
+- `script.js` — all application logic
 - `styles.css` — themes and layout
+- `notes.js` — Notes module (Markdown editor, file tree, wikilinks, backlinks)
 - `logo.png` — dashboard logo
 - `favicon.png` — browser icon
 - `manifest.json` — PWA manifest for desktop install
@@ -97,15 +113,19 @@ The application blocks javascript: URLs in bookmarks and sanitizes all user inpu
 - `USER_GUIDE.md` — comprehensive feature documentation with step-by-step instructions
 - `Customization.txt` — setup guide for feeds, themes, and options
 - `Security_Audit.md` — security review and XSS protection details
+- `lib/lucide_min.js` — Lucide icons (bundled, no CDN)
+- `lib/marked_umd.js` — Markdown parser (bundled, no CDN)
+- `lib/sortable_min.js` — drag-and-drop library (bundled, no CDN)
 
 ## Tech
 
 **100% Offline — Zero External Dependencies**
 
-All libraries are bundled locally for security:
-- Lucide icons (v0.263.1) — bundled in `libs/`
-- SortableJS (v1.15.0) — bundled in `libs/`
+All libraries are bundled locally in `lib/` for security:
+- Lucide icons (v0.263.1) — `lib/lucide_min.js`
+- Marked.js (Markdown parser) — `lib/marked_umd.js`
+- SortableJS (v1.15.0) — `lib/sortable_min.js`
 
-**No CDNs, no external APIs, no network calls.**
+**No CDNs, no external APIs, no network calls (except for RSS feed and subreddit which can be disabled in settings).**
 
 Features requiring external services (RSS feeds, Reddit, update checker) are disabled by default and show security notices. See SECURITY.md for details.

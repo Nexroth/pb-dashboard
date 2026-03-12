@@ -13,6 +13,7 @@ const NotesState = {
   flatFiles:      [],     // All .md files — used for wikilinks + backlinks
   mode:           'edit', // 'edit' | 'preview'
   searchQuery:    '',
+  searchResults:  null,   // null = no search; array = async search results
   initialized:    false,
   dragPath:       null,   // Path of item currently being dragged
 };
@@ -145,6 +146,9 @@ async function buildAndRenderTree() {
   renderTree();
 
   if (!NotesState.currentFile) showNotesEmptyEditor();
+
+  // Refresh Overview stats so Notes count stays in sync
+  if (typeof renderStats === 'function') renderStats();
 }
 
 async function buildTree(dirHandle, path, parentHandle) {
@@ -184,26 +188,120 @@ function renderTree() {
   const q = NotesState.searchQuery.toLowerCase().trim();
 
   if (q) {
-    const results = NotesState.flatFiles.filter(f => f.name.toLowerCase().includes(q));
+    if (NotesState.searchResults === null) {
+      // Still loading
+      container.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">Searching...</div>`;
+      return;
+    }
+    const results = NotesState.searchResults;
     container.innerHTML = results.length
-      ? results.map(f => renderTreeFile(f, 0, true)).join('')
+      ? results.map(r => renderSearchResult(r)).join('')
       : `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">No results</div>`;
-  } else {
-    const items = NotesState.tree.length
-      ? NotesState.tree.map(item => renderTreeItem(item, 0)).join('')
-      : `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">Empty folder</div>`;
-    // Root drop zone at top — lets you move items back to root level
-    container.innerHTML = `
-      <div class="notes-root-dropzone" id="notesRootDropzone" title="Drop here to move to root">
-        <i data-lucide="home"></i>
-        <span>${NotesState.rootHandle?.name || 'Root'}</span>
-      </div>
-      ${items}`;
+    bindTreeEvents();
+    lucide.createIcons();
+    return;
   }
+  const items = NotesState.tree.length
+    ? NotesState.tree.map(item => renderTreeItem(item, 0)).join('')
+    : `<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">Empty folder</div>`;
+  // Root drop zone at top — lets you move items back to root level
+  container.innerHTML = `
+    <div class="notes-root-dropzone" id="notesRootDropzone" title="Drop here to move to root">
+      <i data-lucide="home"></i>
+      <span>${NotesState.rootHandle?.name || 'Root'}</span>
+    </div>
+    ${items}`;
 
   bindTreeEvents();
   lucide.createIcons();
 }
+
+function renderSearchResult(r) {
+  const active  = NotesState.currentFile?.path === r.item.path;
+  const display = r.item.name.replace(/\.md$/, '');
+  const badge   = r.matchType === 'name'
+    ? `<span class="notes-search-badge notes-search-badge-name">name</span>`
+    : `<span class="notes-search-badge notes-search-badge-content">content</span>`;
+  const snippet = r.snippet
+    ? `<div class="notes-search-snippet">${r.snippet}</div>`
+    : '';
+  return `
+    <div class="notes-tree-file${active ? ' notes-tree-file-active' : ''} notes-search-result"
+         style="padding-left:14px"
+         data-path="${notesEscAttr(r.item.path)}" data-type="file" draggable="true">
+      <i data-lucide="file-text" class="notes-tree-icon notes-file-icon" style="flex-shrink:0;margin-top:2px;"></i>
+      <div class="notes-search-result-body">
+        <div class="notes-search-result-title">
+          <span class="notes-tree-name notes-file-name">${notesEscHtml(display)}</span>
+          ${badge}
+        </div>
+        ${snippet}
+      </div>
+    </div>`;
+}
+
+function extractSnippet(text, query, radius = 60) {
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return null;
+  const start = Math.max(0, idx - radius);
+  const end   = Math.min(text.length, idx + query.length + radius);
+  let raw     = text.slice(start, end).replace(/\n+/g, ' ').trim();
+  if (start > 0) raw = '\u2026' + raw;
+  if (end < text.length) raw = raw + '\u2026';
+  const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return notesEscHtml(raw).replace(re, '<mark>$1</mark>');
+}
+
+let _searchDebounce = null;
+
+function triggerSearch(q) {
+  clearTimeout(_searchDebounce);
+  if (!q.trim()) {
+    NotesState.searchQuery   = '';
+    NotesState.searchResults = null;
+    renderTree();
+    return;
+  }
+  NotesState.searchQuery   = q;
+  NotesState.searchResults = null;
+  renderTree();
+  _searchDebounce = setTimeout(() => performSearch(q), 300);
+}
+
+async function performSearch(q) {
+  if (q !== NotesState.searchQuery) return;
+  const lower   = q.toLowerCase().trim();
+  const results = [];
+
+  for (const file of NotesState.flatFiles) {
+    const nameMatch = file.name.toLowerCase().includes(lower);
+    let contentMatch = false;
+    let snippet      = null;
+
+    try {
+      const f    = await file.handle.getFile();
+      const text = await f.text();
+      if (text.toLowerCase().includes(lower)) {
+        contentMatch = true;
+        snippet      = extractSnippet(text, lower);
+      }
+    } catch { /* skip unreadable */ }
+
+    if (nameMatch || contentMatch) {
+      results.push({
+        item:      file,
+        matchType: nameMatch ? 'name' : 'content',
+        snippet:   nameMatch ? null : snippet,
+      });
+    }
+  }
+
+  if (q !== NotesState.searchQuery) return;
+  NotesState.searchResults = results;
+  renderTree();
+}
+
+// ===== TREE RENDERING =====
 
 function renderTreeItem(item, depth) {
   return item.type === 'folder' ? renderTreeFolder(item, depth) : renderTreeFile(item, depth);
@@ -454,6 +552,7 @@ async function openNote(item) {
     if (NotesState.mode === 'preview') updateLivePreview();
     if (NotesState.mode === 'split')   updateLivePreview();
 
+    renderTagsPanel();
     await renderBacklinks();
     renderTree();
     updateBreadcrumb(item);
@@ -551,7 +650,8 @@ function renderMarkdown(raw) {
 }
 
 function updateLivePreview() {
-  const content = document.getElementById('notesEditorTextarea')?.value || '';
+  const raw     = document.getElementById('notesEditorTextarea')?.value || '';
+  const content = parseFrontmatter(raw).body;
   const preview = document.getElementById('notesPreviewContent');
   if (!preview) return;
   preview.innerHTML = renderMarkdown(content);
@@ -578,13 +678,125 @@ async function navigateToWikilink(noteName) {
   }
 }
 
+// ===== TAGS =====
+
+function parseFrontmatter(content) {
+  // Returns { tags: [], body: content }
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!match) return { tags: [], body: content };
+  const fm   = match[1];
+  const body = content.slice(match[0].length);
+  // Parse tags: [a, b] or tags: \n  - a\n  - b
+  let tags = [];
+  const inlineTags = fm.match(/^tags\s*:\s*\[([^\]]*)\]/m);
+  if (inlineTags) {
+    tags = inlineTags[1].split(',').map(t => t.trim().replace(/['"]/g, '')).filter(Boolean);
+  } else {
+    const blockMatch = fm.match(/^tags\s*:\s*\n((?:\s*-\s*.+\n?)+)/m);
+    if (blockMatch) {
+      tags = blockMatch[1].split('\n')
+        .map(l => l.replace(/^\s*-\s*/, '').trim().replace(/['"]/g, ''))
+        .filter(Boolean);
+    }
+  }
+  return { tags, body };
+}
+
+function serializeFrontmatter(content, tags) {
+  // Check if existing frontmatter exists
+  const hasFm = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.test(content);
+  const { body } = parseFrontmatter(content);
+
+  if (!tags.length) {
+    // No tags — strip frontmatter entirely if it only had tags, else remove tags line
+    if (!hasFm) return content;
+    const fmMatch = content.match(/^---([\s\S]*?)---\r?\n?/);
+    if (!fmMatch) return content;
+    const fmBody = fmMatch[1]
+      .replace(/^tags\s*:.*(\n\s*-\s*.+)*/gm, '')
+      .replace(/\n{3,}/g, '\n\n').trim();
+    return fmBody ? `---\n${fmBody}\n---\n${body}` : body;
+  }
+
+  const tagsLine = `tags: [${tags.join(', ')}]`;
+  if (!hasFm) return `---\n${tagsLine}\n---\n${content}`;
+
+  // Update existing frontmatter
+  const fmMatch = content.match(/^---([\s\S]*?)---\r?\n?/);
+  let fmBody = fmMatch[1];
+  if (/^tags\s*:/m.test(fmBody)) {
+    fmBody = fmBody.replace(/^tags\s*:.*(\n\s*-\s*.+)*/gm, tagsLine);
+  } else {
+    fmBody = fmBody.trimEnd() + '\n' + tagsLine + '\n';
+  }
+  return `---${fmBody}---\n${body}`;
+}
+
+function renderTagsPanel() {
+  const list  = document.getElementById('notesTagsList');
+  if (!list) return;
+
+  const { tags } = parseFrontmatter(
+    document.getElementById('notesEditorTextarea')?.value || NotesState.currentContent || ''
+  );
+
+  if (!tags.length) {
+    list.innerHTML = `<div class="notes-tags-empty">No tags</div>`;
+    return;
+  }
+
+  list.innerHTML = tags.map(tag => `
+    <span class="notes-tag-chip">
+      ${notesEscHtml(tag)}
+      <button class="notes-tag-remove" data-tag="${notesEscAttr(tag)}" title="Remove tag">×</button>
+    </span>
+  `).join('');
+
+  list.querySelectorAll('.notes-tag-remove').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await removeTag(btn.dataset.tag);
+    });
+  });
+}
+
+async function addTag(tagName) {
+  const name = tagName.trim().toLowerCase().replace(/\s+/g, '-');
+  if (!name || !NotesState.currentFile) return;
+
+  const content = document.getElementById('notesEditorTextarea').value;
+  const { tags } = parseFrontmatter(content);
+  if (tags.includes(name)) return;
+
+  tags.push(name);
+  const newContent = serializeFrontmatter(content, tags);
+  document.getElementById('notesEditorTextarea').value = newContent;
+  NotesState.isDirty = true;
+  await saveNote();
+  renderTagsPanel();
+}
+
+async function removeTag(tagName) {
+  if (!NotesState.currentFile) return;
+  const content = document.getElementById('notesEditorTextarea').value;
+  const { tags } = parseFrontmatter(content);
+  const newTags   = tags.filter(t => t !== tagName);
+  const newContent = serializeFrontmatter(content, newTags);
+  document.getElementById('notesEditorTextarea').value = newContent;
+  NotesState.isDirty = true;
+  await saveNote();
+  renderTagsPanel();
+}
+
 // ===== BACKLINKS =====
 
 async function renderBacklinks() {
-  const list = document.getElementById('notesBacklinksList');
-  const count = document.getElementById('notesBacklinksCount');
+  const list     = document.getElementById('notesBacklinksList');
+  const count    = document.getElementById('notesBacklinksCount');
+  const outList  = document.getElementById('notesOutgoingList');
+  const outCount = document.getElementById('notesOutgoingCount');
   if (!list || !NotesState.currentFile) return;
 
+  // ---- Incoming backlinks ----
   const currentName = NotesState.currentFile.name.replace(/\.md$/, '');
   const found       = [];
 
@@ -602,24 +814,120 @@ async function renderBacklinks() {
 
   if (!found.length) {
     list.innerHTML = `<div style="color:var(--text-secondary);font-size:13px;font-style:italic;padding:8px 0;">No backlinks</div>`;
-    return;
+  } else {
+    list.innerHTML = found.map(f => `
+      <div class="notes-backlink-item" data-path="${notesEscAttr(f.path)}">
+        <i data-lucide="file-text"></i>
+        <span>${notesEscHtml(f.name.replace(/\.md$/, ''))}</span>
+      </div>
+    `).join('');
+    list.querySelectorAll('.notes-backlink-item').forEach(el => {
+      el.addEventListener('click', async () => {
+        const item = findInTree(NotesState.tree, el.dataset.path);
+        if (item) await openNote(item);
+      });
+    });
   }
 
-  list.innerHTML = found.map(f => `
-    <div class="notes-backlink-item" data-path="${notesEscAttr(f.path)}">
-      <i data-lucide="file-text"></i>
-      <span>${notesEscHtml(f.name.replace(/\.md$/, ''))}</span>
-    </div>
-  `).join('');
+  // ---- Outgoing links ----
+  if (outList) {
+    const currentContent = document.getElementById('notesEditorTextarea')?.value || NotesState.currentContent || '';
+    const wikilinkRe     = /\[\[([^\]|]+)(?:\|[^\]]*)?]]/g;
+    const seenNames      = new Set();
+    const outgoing       = [];
+    let m;
+    while ((m = wikilinkRe.exec(currentContent)) !== null) {
+      const name = m[1].trim();
+      if (seenNames.has(name.toLowerCase())) continue;
+      seenNames.add(name.toLowerCase());
+      const target = NotesState.flatFiles.find(
+        f => f.name.replace(/\.md$/, '').toLowerCase() === name.toLowerCase()
+      );
+      outgoing.push({ name, target: target || null });
+    }
 
-  list.querySelectorAll('.notes-backlink-item').forEach(el => {
-    el.addEventListener('click', async () => {
-      const item = findInTree(NotesState.tree, el.dataset.path);
-      if (item) await openNote(item);
-    });
-  });
+    if (outCount) outCount.textContent = outgoing.length;
+
+    if (!outgoing.length) {
+      outList.innerHTML = `<div style="color:var(--text-secondary);font-size:13px;font-style:italic;padding:8px 0;">No outgoing links</div>`;
+    } else {
+      outList.innerHTML = outgoing.map(o => `
+        <div class="notes-backlink-item${o.target ? '' : ' notes-backlink-missing'}"
+             data-path="${o.target ? notesEscAttr(o.target.path) : ''}"
+             title="${o.target ? '' : 'Note does not exist'}">
+          <i data-lucide="${o.target ? 'file-text' : 'file-question'}"></i>
+          <span>${notesEscHtml(o.name)}</span>
+        </div>
+      `).join('');
+      outList.querySelectorAll('.notes-backlink-item[data-path]').forEach(el => {
+        if (!el.dataset.path) return;
+        el.addEventListener('click', async () => {
+          const item = findInTree(NotesState.tree, el.dataset.path);
+          if (item) await openNote(item);
+        });
+      });
+    }
+  }
 
   lucide.createIcons();
+}
+
+// ===== EXPORT =====
+
+async function exportNoteAsHtml(item) {
+  try {
+    const f       = await item.handle.getFile();
+    const mdText  = await f.text();
+    const title   = item.name.replace(/\.md$/, '');
+    const body    = renderMarkdown(parseFrontmatter(mdText).body);
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 760px; margin: 40px auto; padding: 0 24px; line-height: 1.7; color: #1a1a1a; }
+    h1,h2,h3,h4 { line-height: 1.3; margin-top: 1.6em; }
+    code { background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; }
+    pre { background: #f0f0f0; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    pre code { background: none; padding: 0; }
+    blockquote { border-left: 3px solid #ccc; margin: 0; padding-left: 16px; color: #555; }
+    a { color: #0066cc; }
+    img { max-width: 100%; }
+    hr { border: none; border-top: 1px solid #e0e0e0; margin: 2em 0; }
+    .wikilink { color: #0066cc; cursor: pointer; text-decoration: underline; }
+    .wikilink-missing { color: #999; text-decoration: underline dotted; }
+  </style>
+</head>
+<body>
+${body}
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = title + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Exported "${title}.html"`);
+  } catch (err) {
+    showToast('Export failed: ' + err.message);
+  }
+}
+
+async function copyNoteAsMarkdown(item) {
+  try {
+    const f      = await item.handle.getFile();
+    const mdText = await f.text();
+    await navigator.clipboard.writeText(mdText);
+    showToast('Markdown copied to clipboard');
+  } catch (err) {
+    showToast('Copy failed: ' + err.message);
+  }
 }
 
 // ===== FILE OPERATIONS =====
@@ -731,6 +1039,15 @@ function showNotesContextMenu(e, item) {
     <div class="context-menu-item" data-action="rename">
       <i data-lucide="pencil"></i>Rename
     </div>
+    ${item.type === 'file' ? `
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="export-html">
+      <i data-lucide="file-code"></i>Export as HTML
+    </div>
+    <div class="context-menu-item" data-action="copy-md">
+      <i data-lucide="clipboard"></i>Copy as Markdown
+    </div>
+    ` : ''}
     <div class="context-menu-divider"></div>
     <div class="context-menu-item context-menu-item-danger" data-action="delete">
       <i data-lucide="trash-2"></i>Delete
@@ -752,10 +1069,12 @@ function showNotesContextMenu(e, item) {
     el.addEventListener('click', async () => {
       menu.remove();
       switch (el.dataset.action) {
-        case 'new-note':   await promptCreateNote(item.handle);   break;
-        case 'new-folder': await promptCreateFolder(item.handle); break;
-        case 'rename':     await renameItem(item);                break;
-        case 'delete':     await deleteItem(item);                break;
+        case 'new-note':    await promptCreateNote(item.handle);   break;
+        case 'new-folder':  await promptCreateFolder(item.handle); break;
+        case 'rename':      await renameItem(item);                break;
+        case 'delete':      await deleteItem(item);                break;
+        case 'export-html': await exportNoteAsHtml(item);         break;
+        case 'copy-md':     await copyNoteAsMarkdown(item);       break;
       }
     });
   });
@@ -946,8 +1265,7 @@ function initNotesEvents() {
   });
 
   document.getElementById('notesSearchInput')?.addEventListener('input', e => {
-    NotesState.searchQuery = e.target.value;
-    renderTree();
+    triggerSearch(e.target.value);
   });
 
   const ta = document.getElementById('notesEditorTextarea');
@@ -985,6 +1303,41 @@ function initNotesEvents() {
   document.getElementById('notesModeSplit')?.addEventListener('click', () => setNotesMode('split'));
   document.getElementById('notesModePreview')?.addEventListener('click', () => setNotesMode('preview'));
   document.getElementById('notesSaveBtn')?.addEventListener('click', saveNote);
+
+  // Tag input
+  const tagInput  = document.getElementById('notesTagInput');
+  const tagAddBtn = document.getElementById('notesTagAddBtn');
+  if (tagInput && tagAddBtn) {
+    tagAddBtn.addEventListener('click', () => {
+      if (tagInput.value.trim()) { addTag(tagInput.value); tagInput.value = ''; }
+    });
+    tagInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (tagInput.value.trim()) { addTag(tagInput.value); tagInput.value = ''; }
+      }
+    });
+  }
+
+  // Export button toggle
+  const exportBtn  = document.getElementById('notesExportBtn');
+  const exportMenu = document.getElementById('notesExportMenu');
+  if (exportBtn && exportMenu) {
+    exportBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const open = exportMenu.style.display !== 'none';
+      exportMenu.style.display = open ? 'none' : 'block';
+    });
+    document.getElementById('notesExportHtml')?.addEventListener('click', () => {
+      exportMenu.style.display = 'none';
+      if (NotesState.currentFile) exportNoteAsHtml(NotesState.currentFile);
+    });
+    document.getElementById('notesCopyMd')?.addEventListener('click', () => {
+      exportMenu.style.display = 'none';
+      if (NotesState.currentFile) copyNoteAsMarkdown(NotesState.currentFile);
+    });
+    document.addEventListener('click', () => { exportMenu.style.display = 'none'; });
+  }
 
   // Toolbar
   document.getElementById('notesToolbarBold')?.addEventListener('click', () => notesInsertWrap('**', '**', 'bold text'));

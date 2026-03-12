@@ -114,6 +114,16 @@
                 <div class="stat-label">Bookmarks</div>
               </div>
             </div>
+
+            <div class="stat-card">
+              <div class="stat-icon">
+                <i data-lucide="file-text"></i>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value" id="statNotes">—</div>
+                <div class="stat-label">Notes</div>
+              </div>
+            </div>
             
             <div class="stat-card">
               <div class="stat-icon">
@@ -249,10 +259,24 @@
                     <span>Preview</span>
                   </button>
                 </div>
-                <button class="btn btn-primary" id="notesSaveBtn">
+                <button class="notes-hdr-btn notes-hdr-btn-primary" id="notesSaveBtn">
                   <i data-lucide="save"></i>
                   Save
                 </button>
+                <div class="notes-export-wrapper" id="notesExportWrapper">
+                  <button class="notes-hdr-btn notes-hdr-btn-secondary" id="notesExportBtn">
+                    <i data-lucide="download"></i>
+                    Export
+                  </button>
+                  <div class="notes-export-menu" id="notesExportMenu" style="display:none;">
+                    <div class="notes-export-item" id="notesExportHtml">
+                      <i data-lucide="file-code"></i>Export as HTML
+                    </div>
+                    <div class="notes-export-item" id="notesCopyMd">
+                      <i data-lucide="clipboard"></i>Copy as Markdown
+                    </div>
+                  </div>
+                </div>
                 <button class="icon-btn notes-right-toggle-btn" id="notesRightToggleBtn" title="Toggle properties panel">
                   <i data-lucide="panel-right"></i>
                 </button>
@@ -307,13 +331,34 @@
               <i data-lucide="panel-right-close"></i>
             </button>
           </div>
-          <div class="notes-backlinks">
+          <div class="notes-tags-section" id="notesTagsSection">
+            <div class="notes-backlinks-header">
+              <i data-lucide="tag"></i>
+              <span>Tags</span>
+            </div>
+            <div class="notes-tags-list" id="notesTagsList"></div>
+            <div class="notes-tags-input-row">
+              <input type="text" class="notes-tags-input" id="notesTagInput" placeholder="Add tag…">
+              <button class="icon-btn" id="notesTagAddBtn" title="Add tag">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+          </div>
+          <div class="notes-backlinks" style="margin-top:16px;">
             <div class="notes-backlinks-header">
               <i data-lucide="link-2"></i>
               <span>Backlinks</span>
               <span class="notes-backlinks-count" id="notesBacklinksCount">0</span>
             </div>
             <div class="notes-backlinks-list" id="notesBacklinksList"></div>
+          </div>
+          <div class="notes-backlinks" style="margin-top:16px;">
+            <div class="notes-backlinks-header">
+              <i data-lucide="external-link"></i>
+              <span>Outgoing Links</span>
+              <span class="notes-backlinks-count" id="notesOutgoingCount">0</span>
+            </div>
+            <div class="notes-backlinks-list" id="notesOutgoingList"></div>
           </div>
         </div>
 

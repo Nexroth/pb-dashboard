@@ -1880,6 +1880,15 @@ function renderStats() {
   const overdueTasksEl = document.getElementById('statOverdueTasks');
   
   if (bookmarksEl) bookmarksEl.textContent = stats.bookmarks;
+
+  const notesEl = document.getElementById('statNotes');
+  if (notesEl) {
+    const count = (typeof NotesState !== 'undefined' && NotesState.rootHandle)
+      ? NotesState.flatFiles.length
+      : null;
+    notesEl.textContent = count !== null ? count : '—';
+  }
+
   if (activeProjectsEl) activeProjectsEl.textContent = stats.activeProjects;
   if (pendingTasksEl) pendingTasksEl.textContent = stats.pendingTasks;
   

@@ -1,7 +1,7 @@
 # PB Dashboard — User Guide
 
 > Complete guide to using all features of the PB Dashboard
-> Last updated: v2.4.0 — February 17, 2026
+> Last updated: v2.5.0 — March 2026
 
 ---
 
@@ -9,13 +9,14 @@
 
 1. [Getting Started](#getting-started)
 2. [Home — Bookmarks](#home--bookmarks)
-3. [Projects](#projects)
-4. [Tasks](#tasks)
-5. [Calendar](#calendar)
-6. [News](#news)
-7. [Settings](#settings)
-8. [Keyboard Shortcuts](#keyboard-shortcuts)
-9. [Data Management](#data-management)
+3. [Notes](#notes)
+4. [Projects](#projects)
+5. [Tasks](#tasks)
+6. [Calendar](#calendar)
+7. [News](#news)
+8. [Settings](#settings)
+9. [Keyboard Shortcuts](#keyboard-shortcuts)
+10. [Data Management](#data-management)
 
 ---
 
@@ -129,6 +130,94 @@ Results update as you type. Search is case-insensitive.
 **Keyboard shortcut:** Press `/` to focus the search bar from anywhere on the Home page.
 
 ![Search Results](images/b_searchresults.png)
+
+---
+
+## Notes
+
+The Notes page is a local Markdown editor that reads and writes `.md` files directly to a folder on your computer. Your files stay on disk — no data loss if you clear browser cache — and work alongside any other editor (Obsidian, VS Code, Notepad, etc.).
+
+> **Browser requirement:** The Notes module uses the File System Access API, which is only available in **Chrome and Edge v86+**. Firefox and Safari are not supported. If you open Notes on an unsupported browser, you'll see a warning instead of the editor.
+
+### Setting Up Your Vault
+
+On first use you'll see the Notes setup screen.
+
+**To select your notes folder:**
+1. Click **Select Notes Folder**
+2. Choose a folder from the system file picker (any folder on your computer works)
+3. Click **Allow** when the browser asks for read/write permission
+
+The dashboard remembers your selected folder using IndexedDB. On subsequent visits it asks for permission again automatically — just confirm when prompted. No need to re-select the folder.
+
+### File Tree
+
+The left panel shows the file and folder tree for your vault.
+
+- Folders appear above files; both groups are sorted alphabetically
+- Click a folder to expand or collapse it — state is remembered across sessions
+- Click a file to open it in the editor
+- Hidden files and folders (names starting with `.`) are excluded
+
+**To create a new note:**
+1. Click **New Note** in the toolbar
+2. Enter a filename (`.md` is added automatically if omitted)
+3. The file is created and opened immediately
+
+**To create a new folder:**
+1. Click **New Folder** in the toolbar
+2. Enter a folder name
+3. The folder appears in the tree
+
+**To rename a file or folder:**
+- Right-click it in the tree → **Rename**
+
+**To delete a file or folder:**
+- Right-click it in the tree → **Delete** (folders must be empty first)
+
+**To move a file or folder:**
+- Drag it to a different folder in the tree, or drag it to the **Root** drop zone at the top to move it back to the vault root
+
+**To search files:**
+- Type in the search box above the tree — results filter as you type by filename
+
+**To refresh the tree** (if files were changed by another app):
+- Click the **Refresh** button in the toolbar
+
+### Writing Notes
+
+The editor area on the right shows the currently open file.
+
+**Edit mode** — raw Markdown text. Changes are tracked; unsaved changes show a dot indicator on the tab.
+
+**To save:** `Ctrl+S` or click **Save**. The file is written directly to disk.
+
+**Preview mode** — rendered Markdown. Headings, bold, italics, code blocks, tables, and links are all rendered. Wikilinks (`[[note name]]`) are rendered as clickable links.
+
+**To toggle mode:** Click **Edit** / **Preview** in the toolbar, or press `Ctrl+E`.
+
+### Wikilinks
+
+Type `[[Note Name]]` anywhere in a note to create a link to another note.
+
+- In preview mode, wikilinks are rendered as clickable links
+- Clicking a wikilink opens that note in the editor
+- The link matches by filename (without the `.md` extension), case-insensitive
+- If the target file doesn't exist, the link still renders but clicking it does nothing
+
+### Backlinks
+
+The **Backlinks** panel at the bottom of the editor shows every note in your vault that contains a wikilink pointing to the note you're currently viewing.
+
+- Click any backlink entry to jump to that note
+- The panel updates automatically when you switch files
+
+### Keyboard Shortcuts (Notes)
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+S` | Save current file |
+| `Ctrl+E` | Toggle edit / preview mode |
 
 ---
 
@@ -695,6 +784,6 @@ Repeat whenever you want to sync changes.
 
 ---
 
-**Last updated:** v2.4.0 — February 17, 2026  
+**Last updated:** v2.5.0 — March 2026  
 **GitHub:** [Nexroth/pb-dashboard](https://github.com/Nexroth/pb-dashboard)  
 **Issues & Feedback:** Use the GitHub Issues tab or the 👎 button in the dashboard
