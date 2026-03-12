@@ -77,7 +77,7 @@
       </a>
     </nav>
     <div class="sidebar-footer">
-      <span class="sidebar-version" id="sidebarVersion">v2.4.0</span>
+      <span class="sidebar-version" id="sidebarVersion">v2.4.1</span>
       <button class="sidebar-help-btn" id="sidebarHelpBtn" title="Keyboard shortcuts">
         <i data-lucide="help-circle"></i>
       </button>
@@ -518,9 +518,27 @@
         </div>
 
         <div class="setting-group">
+          <h3>Network Access</h3>
+          <div class="setting-item" onclick="document.getElementById('allowNetworkToggle').click()">
+            <div class="setting-label-wrapper">
+              <div class="setting-label-title">Enable External Network Access</div>
+              <div class="setting-label-description">
+                Required for the News page to fetch RSS feeds and Reddit posts. When enabled, the dashboard
+                makes outbound calls to <strong>api.rss2json.com</strong> for both RSS feeds and Reddit content.
+                Disable in air-gapped or high-security environments. Off by default.
+              </div>
+            </div>
+            <label class="toggle-switch" onclick="event.stopPropagation()">
+              <input type="checkbox" id="allowNetworkToggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-group">
           <h3>Updates</h3>
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-            <span style="color: var(--text-secondary);">Current Version: <strong id="currentVersion">2.4.0</strong></span>
+            <span style="color: var(--text-secondary);">Current Version: <strong id="currentVersion">2.4.1</strong></span>
           </div>
 <!--Update checker-->
           <button id="checkUpdatesBtn" class="btn btn-primary">Check for Updates</button>
@@ -654,6 +672,7 @@
         <div id="redditSubsList" class="feeds-list"></div>
         <div class="form-group" style="margin-top: 20px;">
           <input type="text" id="newRedditInput" class="form-control" placeholder="e.g., cybersecurity (without r/)">
+          <small style="color: var(--text-secondary); display: block; margin-top: 6px;">Enter the subreddit name only. Subreddits must be public — posts are fetched via RSS (top of the past week).</small>
           <button id="addRedditBtn" class="btn btn-primary" style="margin-top: 8px;">Add Subreddit</button>
         </div>
       </div>

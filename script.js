@@ -1,13 +1,15 @@
 // ===== CONSTANTS & STATE =====
 
 // Dashboard version
-const DASHBOARD_VERSION = '2.4.0';
+const DASHBOARD_VERSION = '2.4.1';
 
-// SECURITY: Disable all external network calls for air-gapped deployment
-// Set to false to enable RSS/Reddit features (requires internet and external APIs)
-const ALLOW_EXTERNAL_NETWORK = false;
+// SECURITY: External network access is off by default for air-gapped deployment
+// Controlled at runtime via Settings → Network Access toggle (stored in localStorage)
+function getAllowExternalNetwork() {
+  return localStorage.getItem('allowExternalNetwork') === 'true';
+}
 
-// Default news feeds (only used if ALLOW_EXTERNAL_NETWORK is true)
+// Default news feeds (only used if external network access is enabled)
 const DEFAULT_FEEDS = [
   'https://news.ycombinator.com/rss',
   'https://www.bleepingcomputer.com/feed/',
@@ -228,7 +230,7 @@ function migrateData(data) {
   if (!data.templates.projectTemplates) data.templates.projectTemplates = [];
   if (!data.templates.taskTemplates) data.templates.taskTemplates = [];
 
-  // Add linkedTaskTemplates to project templates (v2.4.0)
+  // Add linkedTaskTemplates to project templates (v2.4.1)
   data.templates.projectTemplates.forEach(pt => {
     if (!pt.linkedTaskTemplates) pt.linkedTaskTemplates = [];
   });
@@ -593,7 +595,7 @@ async function checkForUpdates() {
   const instructionsEl = document.getElementById('updateInstructions');
   
   // SECURITY: Block external network calls
-  if (!ALLOW_EXTERNAL_NETWORK) {
+  if (!getAllowExternalNetwork()) {
     notification.style.display = 'block';
     statusEl.textContent = '🔒 External network access disabled';
     statusEl.style.color = 'var(--text-secondary)';
@@ -2014,6 +2016,19 @@ function initNotifications() {
   if (notifSettings.enabled) {
     startNotificationChecker();
   }
+
+  // Network access toggle
+  const networkToggle = document.getElementById('allowNetworkToggle');
+  if (networkToggle) {
+    networkToggle.checked = getAllowExternalNetwork();
+    networkToggle.addEventListener('change', () => {
+      localStorage.setItem('allowExternalNetwork', networkToggle.checked);
+      showToast(networkToggle.checked
+        ? '⚠️ External network access enabled'
+        : '🔒 External network access disabled'
+      );
+    });
+  }
 }
 
 function getNotificationSettings() {
@@ -2618,15 +2633,15 @@ async function loadSingleRSSFeed(feedUrl) {
   const content = document.getElementById('rssContent');
   
   // SECURITY: Block external network calls
-  if (!ALLOW_EXTERNAL_NETWORK) {
+  if (!getAllowExternalNetwork()) {
     content.innerHTML = `
       <div class="news-error">
         <i data-lucide="shield-off"></i>
         <div>
           <div>External network access is disabled</div>
           <div style="font-size: 0.9em; margin-top: 8px; opacity: 0.8;">
-            RSS feeds require external API calls. For security, this feature is disabled.
-            Set ALLOW_EXTERNAL_NETWORK = true in script.js to enable (not recommended for production).
+            RSS feeds require external API calls. To use this feature, enable
+            <strong>Network Access</strong> in Settings.
           </div>
         </div>
       </div>
@@ -2864,15 +2879,15 @@ async function loadReddit(subreddit) {
   const content = document.getElementById('redditContent');
   
   // SECURITY: Block external network calls
-  if (!ALLOW_EXTERNAL_NETWORK) {
+  if (!getAllowExternalNetwork()) {
     content.innerHTML = `
       <div class="news-error">
         <i data-lucide="shield-off"></i>
         <div>
           <div>External network access is disabled</div>
           <div style="font-size: 0.9em; margin-top: 8px; opacity: 0.8;">
-            Reddit integration requires external API calls. For security, this feature is disabled.
-            Set ALLOW_EXTERNAL_NETWORK = true in script.js to enable (not recommended for production).
+            Reddit integration requires external API calls. To use this feature, enable
+            <strong>Network Access</strong> in Settings.
           </div>
         </div>
       </div>
@@ -2884,7 +2899,9 @@ async function loadReddit(subreddit) {
   content.innerHTML = '<div class="news-loading">Loading r/' + subreddit + '...</div>';
 
   try {
-    const response = await fetch(`https://corsproxy.io/?https://www.reddit.com/r/${subreddit}/top.json?t=week&limit=${UI_CONSTANTS.REDDIT_POST_LIMIT}`);
+    // Use Reddit's RSS feed via rss2json — avoids CORS proxy and Reddit API restrictions
+    const rssUrl = `https://www.reddit.com/r/${subreddit}/top.rss?t=week`;
+    const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=${UI_CONSTANTS.REDDIT_POST_LIMIT}`);
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -2892,13 +2909,13 @@ async function loadReddit(subreddit) {
     
     const data = await response.json();
     
-    if (!data.data || !data.data.children) {
+    if (data.status !== 'ok' || !data.items) {
       content.innerHTML = '<div class="news-error"><i data-lucide="alert-circle"></i><span>Subreddit not found or is private</span></div>';
       lucide.createIcons();
       return;
     }
 
-    const posts = data.data.children.map(post => post.data);
+    const posts = data.items;
     
     if (posts.length === 0) {
       content.innerHTML = '<div class="news-error"><i data-lucide="inbox"></i><span>No posts found this week</span></div>';
@@ -2907,11 +2924,11 @@ async function loadReddit(subreddit) {
     }
     
     content.innerHTML = posts.map(post => {
-      const text = post.selftext?.substring(0, 250) || '';
-      const timeAgo = getTimeAgo(new Date(post.created_utc * 1000));
+      const timeAgo = getTimeAgo(new Date(post.pubDate));
+      const postUrl = post.link || '';
       
       return `
-        <div class="reddit-item" onclick="window.open('https://reddit.com${post.permalink}', '_blank')">
+        <div class="reddit-item" onclick="window.open('${postUrl}', '_blank')">
           <div class="reddit-item-header">
             <div class="reddit-item-title">${post.title}</div>
           </div>
@@ -2919,12 +2936,8 @@ async function loadReddit(subreddit) {
             <span class="reddit-subreddit">r/${subreddit}</span>
             <div class="reddit-stats">
               <span class="reddit-stat">
-                <i data-lucide="arrow-up"></i>
-                ${post.score}
-              </span>
-              <span class="reddit-stat">
-                <i data-lucide="message-circle"></i>
-                ${post.num_comments}
+                <i data-lucide="user"></i>
+                ${post.author || 'unknown'}
               </span>
               <span class="reddit-stat">
                 <i data-lucide="clock"></i>
@@ -2932,9 +2945,8 @@ async function loadReddit(subreddit) {
               </span>
             </div>
           </div>
-          ${text ? `<div class="reddit-item-text">${text}${text.length >= 250 ? '...' : ''}</div>` : ''}
           <div class="reddit-item-footer">
-            <a href="https://reddit.com${post.permalink}" target="_blank" class="reddit-item-link" onclick="event.stopPropagation()">
+            <a href="${postUrl}" target="_blank" class="reddit-item-link" onclick="event.stopPropagation()">
               View discussion
               <i data-lucide="arrow-right"></i>
             </a>
