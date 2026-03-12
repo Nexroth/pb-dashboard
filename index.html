@@ -55,6 +55,10 @@
         <i data-lucide="home"></i>
         <span>Home</span>
       </a>
+      <a href="#" class="nav-item" data-page="notes">
+        <i data-lucide="notebook-pen"></i>
+        <span>Notes</span>
+      </a>
       <a href="#" class="nav-item" data-page="projects">
         <i data-lucide="folder-kanban"></i>
         <span>Projects</span>
@@ -77,7 +81,7 @@
       </a>
     </nav>
     <div class="sidebar-footer">
-      <span class="sidebar-version" id="sidebarVersion">v2.4.1</span>
+      <span class="sidebar-version" id="sidebarVersion">v2.5.0</span>
       <button class="sidebar-help-btn" id="sidebarHelpBtn" title="Keyboard shortcuts">
         <i data-lucide="help-circle"></i>
       </button>
@@ -179,6 +183,141 @@
         </button>
       </div>
       <div id="sectionsContainer" class="sections-container"></div>
+    </div>
+
+    <!-- Notes Page -->
+    <div id="notesPage" class="page">
+      <div class="page-header">
+        <h1>Notes</h1>
+      </div>
+
+      <div class="notes-layout">
+
+        <!-- Left Panel: File Tree -->
+        <div class="notes-left-panel" id="notesTreePanel">
+          <div class="notes-left-header">
+            <span class="notes-left-title">Explorer</span>
+            <div class="notes-left-actions">
+              <button class="icon-btn" id="notesNewNoteBtn" title="New Note" disabled>
+                <i data-lucide="file-plus"></i>
+              </button>
+              <button class="icon-btn" id="notesNewFolderBtn" title="New Folder" disabled>
+                <i data-lucide="folder-plus"></i>
+              </button>
+              <button class="icon-btn" id="notesRefreshBtn" title="Refresh tree" disabled>
+                <i data-lucide="refresh-cw"></i>
+              </button>
+              <button class="icon-btn" id="notesChangeFolderBtn" title="Change Folder">
+                <i data-lucide="folder-open"></i>
+              </button>
+            </div>
+          </div>
+          <div class="notes-tree-search">
+            <i data-lucide="search" class="notes-search-icon"></i>
+            <input type="text" id="notesSearchInput" class="notes-search-input" placeholder="Search notes...">
+          </div>
+          <div class="notes-tree-content" id="notesTreeContent"></div>
+        </div>
+
+        <!-- Left Resize Handle -->
+        <div class="notes-resize-handle" id="notesResizeLeft"></div>
+
+        <!-- Center Panel: Editor -->
+        <div class="notes-center-panel" id="notesEditorPanel">
+
+          <!-- Empty state / setup -->
+          <div class="notes-empty-state" id="notesEmptyState"></div>
+
+          <!-- Active editor -->
+          <div class="notes-editor-area" id="notesEditorArea" style="display:none;">
+
+            <div class="notes-editor-header">
+              <span class="notes-editor-filename" id="notesEditorFilename"></span>
+              <div class="notes-editor-header-right">
+                <span class="notes-save-indicator" id="notesSaveIndicator"></span>
+                <div class="view-toggle">
+                  <button class="view-btn active" id="notesModeEdit">
+                    <i data-lucide="pencil"></i>
+                    <span>Edit</span>
+                  </button>
+                  <button class="view-btn" id="notesModeSplit">
+                    <i data-lucide="columns-2"></i>
+                    <span>Split</span>
+                  </button>
+                  <button class="view-btn" id="notesModePreview">
+                    <i data-lucide="eye"></i>
+                    <span>Preview</span>
+                  </button>
+                </div>
+                <button class="btn btn-primary" id="notesSaveBtn">
+                  <i data-lucide="save"></i>
+                  Save
+                </button>
+                <button class="icon-btn notes-right-toggle-btn" id="notesRightToggleBtn" title="Toggle properties panel">
+                  <i data-lucide="panel-right"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Breadcrumb path -->
+            <div class="notes-breadcrumb" id="notesBreadcrumb" style="display:none;">
+              <i data-lucide="home" class="notes-breadcrumb-home"></i>
+              <span class="notes-breadcrumb-items" id="notesBreadcrumbItems"></span>
+            </div>
+
+            <div class="notes-toolbar" id="notesToolbar">
+              <button class="notes-toolbar-btn" id="notesToolbarBold" title="Bold"><strong>B</strong></button>
+              <button class="notes-toolbar-btn notes-toolbar-italic" id="notesToolbarItalic" title="Italic"><em>I</em></button>
+              <div class="notes-toolbar-sep"></div>
+              <button class="notes-toolbar-btn" id="notesToolbarH1" title="Heading 1">H1</button>
+              <button class="notes-toolbar-btn" id="notesToolbarH2" title="Heading 2">H2</button>
+              <button class="notes-toolbar-btn" id="notesToolbarH3" title="Heading 3">H3</button>
+              <div class="notes-toolbar-sep"></div>
+              <button class="notes-toolbar-btn" id="notesToolbarUL" title="Unordered list"><i data-lucide="list"></i></button>
+              <button class="notes-toolbar-btn" id="notesToolbarOL" title="Ordered list"><i data-lucide="list-ordered"></i></button>
+              <button class="notes-toolbar-btn" id="notesToolbarQuote" title="Blockquote"><i data-lucide="quote"></i></button>
+              <div class="notes-toolbar-sep"></div>
+              <button class="notes-toolbar-btn" id="notesToolbarCode" title="Inline code"><i data-lucide="code"></i></button>
+              <button class="notes-toolbar-btn" id="notesToolbarCodeBlock" title="Code block"><i data-lucide="square-code"></i></button>
+              <button class="notes-toolbar-btn" id="notesToolbarLink" title="Link"><i data-lucide="link"></i></button>
+              <div class="notes-toolbar-sep"></div>
+              <button class="notes-toolbar-btn notes-toolbar-wikilink" id="notesToolbarWikilink" title="Wikilink">[[]]</button>
+              <button class="notes-toolbar-btn" id="notesToolbarHR" title="Horizontal rule"><i data-lucide="minus"></i></button>
+            </div>
+
+            <div class="notes-body" id="notesBody">
+              <div class="notes-edit-pane" id="notesEditPane">
+                <textarea class="notes-textarea" id="notesEditorTextarea" spellcheck="true" placeholder="Start writing…"></textarea>
+              </div>
+              <div class="notes-split-divider" id="notesSplitDivider" style="display:none;"></div>
+              <div class="notes-preview" id="notesPreviewContent" style="display:none;"></div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right Resize Handle -->
+        <div class="notes-resize-handle" id="notesResizeRight"></div>
+
+        <!-- Right Panel: Properties & Backlinks -->
+        <div class="notes-right-panel" id="notesRightPanel">
+          <div class="notes-right-header">
+            <span class="notes-right-title">Properties</span>
+            <button class="icon-btn" id="notesRightCollapseBtn" title="Collapse panel">
+              <i data-lucide="panel-right-close"></i>
+            </button>
+          </div>
+          <div class="notes-backlinks">
+            <div class="notes-backlinks-header">
+              <i data-lucide="link-2"></i>
+              <span>Backlinks</span>
+              <span class="notes-backlinks-count" id="notesBacklinksCount">0</span>
+            </div>
+            <div class="notes-backlinks-list" id="notesBacklinksList"></div>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <!-- News Page -->
@@ -538,7 +677,7 @@
         <div class="setting-group">
           <h3>Updates</h3>
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-            <span style="color: var(--text-secondary);">Current Version: <strong id="currentVersion">2.4.1</strong></span>
+            <span style="color: var(--text-secondary);">Current Version: <strong id="currentVersion">2.5.0</strong></span>
           </div>
 <!--Update checker-->
           <button id="checkUpdatesBtn" class="btn btn-primary">Check for Updates</button>
@@ -1040,6 +1179,8 @@
       </div>
     </div>
   </div>
+  <script src="libs/marked.umd.js"></script>
+  <script src="notes.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

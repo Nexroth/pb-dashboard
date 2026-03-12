@@ -1,7 +1,7 @@
 // ===== CONSTANTS & STATE =====
 
 // Dashboard version
-const DASHBOARD_VERSION = '2.4.1';
+const DASHBOARD_VERSION = '2.5.0';
 
 // SECURITY: External network access is off by default for air-gapped deployment
 // Controlled at runtime via Settings → Network Access toggle (stored in localStorage)
@@ -230,7 +230,7 @@ function migrateData(data) {
   if (!data.templates.projectTemplates) data.templates.projectTemplates = [];
   if (!data.templates.taskTemplates) data.templates.taskTemplates = [];
 
-  // Add linkedTaskTemplates to project templates (v2.4.1)
+  // Add linkedTaskTemplates to project templates (v2.5.0)
   data.templates.projectTemplates.forEach(pt => {
     if (!pt.linkedTaskTemplates) pt.linkedTaskTemplates = [];
   });
@@ -694,6 +694,12 @@ function switchPage(pageName) {
   document.getElementById(pageName + 'Page').classList.add('active');
   document.querySelector(`[data-page="${pageName}"]`).classList.add('active');
 
+  if (pageName === 'notes') {
+    if (!NotesState.initialized) {
+      NotesState.initialized = true;
+      initNotesPage();
+    }
+  }
   if (pageName === 'news') {
     initializeRSSFeedTabs();
     initializeNewsTabs();
